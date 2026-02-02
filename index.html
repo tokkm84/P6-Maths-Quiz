@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Math Student Portal</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f0f4f8; display: flex; justify-content: center; padding: 20px; margin: 0; min-height: 100vh; }
+        .container { background: white; width: 100%; max-width: 600px; padding: 40px; border-radius: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.1); text-align: center; }
+        
+        h1 { color: #2c3e50; margin-bottom: 10px; font-weight: 800; }
+        p { color: #7f8c8d; margin-bottom: 30px; }
+        
+        .level-group { margin-bottom: 30px; text-align: left; }
+        .level-title { font-size: 0.9em; font-weight: bold; color: #95a5a6; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; border-bottom: 2px solid #ecf0f1; padding-bottom: 5px; }
+        
+        .quiz-btn { 
+            display: block; 
+            width: 100%; 
+            padding: 15px 20px; 
+            margin-bottom: 15px; 
+            background: white; 
+            border: 2px solid #dfe6e9; 
+            border-radius: 12px; 
+            text-decoration: none; 
+            color: #2c3e50; 
+            font-weight: 600; 
+            transition: all 0.2s; 
+            position: relative;
+            box-sizing: border-box;
+        }
+        
+        .quiz-btn:hover { border-color: #3498db; background-color: #f4fcff; transform: translateX(5px); }
+        
+        .badge { 
+            background-color: #3498db; color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.75em; margin-left: 10px; vertical-align: middle; 
+        }
+        .badge.new { background-color: #e74c3c; }
+        
+        .footer { margin-top: 40px; font-size: 0.8em; color: #bdc3c7; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h1>🎓 Math Practice Portal</h1>
+    <p>Select a quiz to begin your revision.</p>
+
+    <div class="level-group">
+        <div class="level-title">Primary 6</div>
+        
+        <a href="p6-fractions.html" class="quiz-btn">
+            📐 Fractions Mastery <span class="badge new">New</span>
+        </a>
+        
+        <a href="#" class="quiz-btn" style="opacity:0.5; cursor:not-allowed;">
+            📊 Percentage & Ratios (Coming Soon)
+        </a>
+    </div>
+
+    <div class="level-group">
+        <div class="level-title">Primary 5</div>
+        
+        <a href="#" class="quiz-btn" style="opacity:0.5; cursor:not-allowed;">
+            🔻 Geometry Basics (Coming Soon)
+        </a>
+    </div>
+
+    <div class="footer">© 2024 Math Tuition. All rights reserved.</div>
+</div>
+
+</body>
+</html>
