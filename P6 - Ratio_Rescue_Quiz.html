@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ratio Rescue: PSLE Edition (Home Learning)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
+    <script type="module">
+        // ==========================================================================================
+        //  TEACHER CONFIGURATION AREA
+        // ==========================================================================================
+        
+        // Google Form Base Link
+        const FORM_BASE_URL     = "https://docs.google.com/forms/d/e/1FAIpQLScSVH5G5QVKCtmbbtt08CHX9--ecu5ZfO2ZHAC03hGPR_FCPw/viewform"; 
+        
+        // Auto-Fill Entry IDs (Extracted from your link)
+        const ENTRY_ID_NAME     = "1376623119"; 
+        const ENTRY_ID_SCORE    = "2032202022"; 
+        const ENTRY_ID_LEVEL    = "1918358329"; 
+
+        // Teacher Email
+        const TEACHER_EMAIL     = "newtonlabtuition@gmail.com"; 
+
+        // ==========================================================================================
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, query, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        window.teacherConfig = {
+            formUrl: FORM_BASE_URL,
+            entryName: ENTRY_ID_NAME,
+            entryScore: ENTRY_ID_SCORE,
+            entryLevel: ENTRY_ID_LEVEL,
+            email: TEACHER_EMAIL
+        };
+
+        window.firebaseState = { db: null, user: null, appId: 'default', isOnline: false };
+
+        const initFirebase = async () => {
+            try {
+                if (typeof __firebase_config === 'undefined') throw new Error("Local/Offline Mode");
+                const firebaseConfig = JSON.parse(__firebase_config);
+                const app = initializeApp(firebaseConfig);
+                const auth = getAuth(app);
+                const db = getFirestore(app);
+                window.firebaseState.db = db;
+                window.firebaseState.appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        window.firebaseState.user = user;
+                        window.firebaseState.isOnline = true;
+                        window.updateConnectionStatus(true);
+                    }
+                });
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (e) {
+                console.log("⚠️ Offline Mode:", e.message);
+                window.updateConnectionStatus(false);
+            }
+        };
+        initFirebase();
+
+        window.saveStudentResult = async (studentName, score, level, detailedLog) => {
+            if (!window.firebaseState.isOnline) return false;
+            try {
+                const colRef = collection(window.firebaseState.db, 'artifacts', window.firebaseState.appId, 'public', 'data', 'student_results');
+                await addDoc(colRef, { studentName, score, maxLevelReached: level, timestamp: serverTimestamp(), details: detailedLog });
+                return true;
+            } catch (e) { return false; }
+        };
+        
+        window.listenToResults = (callback) => {
+            if (!window.firebaseState.isOnline) { callback([]); return; }
+            const colRef = collection(window.firebaseState.db, 'artifacts', window.firebaseState.appId, 'public', 'data', 'student_results');
+            const q = query(colRef);
+            return onSnapshot(q, (snapshot) => {
+                const results = [];
+                snapshot.forEach(doc => results.push({ id: doc.id, ...doc.data() }));
+                results.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
+                callback(results);
+            });
+        };
+    </script>
+
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Press+Start+2P&display=swap');
+        :root { --primary-color: #6d28d9; --bg-color: #1e1b4b; --text-color: #e0e7ff; }
+        body { font-family: 'Fredoka', sans-serif; background-color: var(--bg-color); color: var(--text-color); background-image: radial-gradient(circle at 10% 20%, rgb(33, 27, 78) 0%, rgb(24, 20, 60) 90.2%); min-height: 100vh; }
+        .pixel-font { font-family: 'Press Start 2P', cursive; }
+        .card { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(10px); border: 2px solid rgba(255, 255, 255, 0.2); border-radius: 1.5rem; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); }
+        .option-btn { transition: all 0.2s; border-bottom: 4px solid #b91c1c; }
+        .option-btn:active { transform: translateY(2px); border-bottom: 0px solid; }
+        .option-btn:disabled { opacity: 0.7; cursor: not-allowed; }
+        @keyframes shimmer { 0% { background-position: -1000px 0; } 100% { background-position: 1000px 0; } }
+        .ai-btn { background: linear-gradient(90deg, #6d28d9, #db2777); background-size: 200% 100%; animation: shimmer 5s infinite linear; border: 2px solid #facc15; box-shadow: 0 0 15px rgba(219, 39, 119, 0.5); }
+        .ai-btn:hover { box-shadow: 0 0 25px rgba(219, 39, 119, 0.8); transform: scale(1.02); }
+        .sage-box { border-left: 4px solid #db2777; background: rgba(219, 39, 119, 0.15); }
+        .feedback-correct { animation: pulse-green 1s infinite; border-color: #4ade80; }
+        .feedback-wrong { animation: pulse-red 1s infinite; border-color: #ef4444; }
+        @keyframes pulse-green { 0% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0.7); } 70% { box-shadow: 0 0 0 20px rgba(74, 222, 128, 0); } 100% { box-shadow: 0 0 0 0 rgba(74, 222, 128, 0); } }
+        @keyframes pulse-red { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+        @keyframes float { 0% { transform: translateY(0px); } 50% { transform: translateY(-10px); } 100% { transform: translateY(0px); } }
+        .hero-img { animation: float 3s ease-in-out infinite; }
+        #confetti-canvas { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
+        
+        .modal-overlay { background-color: rgba(0,0,0,0.85); z-index: 50; }
+        #leaderboard-modal { z-index: 60; }
+        #shop-modal { z-index: 70; }
+        
+        .dashboard-table th { text-align: left; padding: 12px; color: #facc15; border-bottom: 2px solid #4c1d95; }
+        .dashboard-table td { padding: 12px; border-bottom: 1px solid #4c1d95; }
+        .dashboard-table tr:hover { background: rgba(255,255,255,0.05); }
+        #loading-overlay { z-index: 200; }
+        
+        .gold-row { background: rgba(255, 215, 0, 0.15) !important; border-left: 4px solid gold; }
+        .silver-row { background: rgba(192, 192, 192, 0.15) !important; border-left: 4px solid silver; }
+        .bronze-row { background: rgba(205, 127, 50, 0.15) !important; border-left: 4px solid #cd7f32; }
+    </style>
+</head>
+<body>
+
+    <canvas id="confetti-canvas"></canvas>
+
+    <!-- Main Menu Screen -->
+    <div id="start-screen" class="min-h-screen flex flex-col items-center justify-center p-4 text-center">
+        <div class="mb-6">
+            <i class="fas fa-scroll text-6xl text-yellow-400 mb-4 hero-img"></i>
+            <h1 class="text-4xl md:text-5xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-pink-500 to-yellow-400 pixel-font" style="line-height: 1.4;">RATIO<br>RESCUE</h1>
+            <p class="text-sm text-blue-200 mt-2 tracking-widest uppercase">Student Edition</p>
+        </div>
+        
+        <div class="card p-8 max-w-md w-full mb-8 relative">
+            <div class="mb-6">
+                <label class="block text-left text-sm font-bold mb-2 text-pink-300">Enter Your Name</label>
+                <input type="text" id="student-name-input" placeholder="e.g., Joy Tan" class="w-full bg-gray-800 text-white border-2 border-purple-500 rounded-lg p-3 focus:outline-none focus:border-yellow-400 transition">
+            </div>
+
+            <button onclick="checkNameAndStart()" id="start-btn" disabled class="w-full bg-gray-600 text-gray-400 font-bold py-4 px-6 rounded-xl shadow-lg transition pixel-font mb-4 cursor-not-allowed">
+                <i class="fas fa-circle-notch fa-spin mr-2"></i> CONNECTING...
+            </button>
+            
+             <div class="flex gap-2">
+                <button onclick="showLeaderboard()" class="w-1/2 bg-gray-700 hover:bg-gray-600 text-yellow-400 text-xs font-bold py-2 px-4 rounded-lg transition border border-gray-600">
+                    <i class="fas fa-trophy mr-2"></i> Leaderboard
+                </button>
+                <button onclick="openTeacherPortal()" id="teacher-btn" class="w-1/2 bg-transparent border border-gray-500 text-gray-400 hover:text-white hover:border-white text-xs font-bold py-2 px-4 rounded-lg transition">
+                    <i class="fas fa-chalkboard-teacher mr-2"></i> Teachers
+                </button>
+            </div>
+        </div>
+        
+        <p class="text-xs text-gray-500" id="connection-status">Initializing...</p>
+    </div>
+
+    <!-- Leaderboard Modal -->
+    <div id="leaderboard-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center px-4">
+        <div class="card p-6 max-w-lg w-full bg-gray-900 border border-yellow-500 max-h-[80vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h3 class="text-2xl font-bold text-yellow-400 pixel-font"><i class="fas fa-trophy mr-2"></i> HALL OF FAME</h3>
+                <button onclick="closeLeaderboard()" class="text-gray-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            
+            <div class="overflow-x-auto">
+                <table class="w-full text-sm dashboard-table">
+                    <thead>
+                        <tr>
+                            <th class="w-16">Rank</th>
+                            <th>Hero Name</th>
+                            <th>Best Score</th>
+                            <th>Attempts</th>
+                        </tr>
+                    </thead>
+                    <tbody id="leaderboard-body">
+                        <tr><td colspan="4" class="text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-purple-500"></i><br>Summoning Records...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Shop / Continue Modal -->
+    <div id="shop-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center px-4">
+        <div class="card p-8 max-w-md w-full bg-gray-900 border-2 border-red-500 text-center">
+            <div class="mb-6">
+                <i class="fas fa-heart-broken text-5xl text-red-500 mb-2"></i>
+                <h2 class="text-2xl font-bold text-white pixel-font">OUT OF HEARTS!</h2>
+                <p class="text-gray-400 mt-2">But wait! You can buy a second chance.</p>
+            </div>
+            
+            <div class="bg-gray-800 p-4 rounded-lg mb-6 border border-yellow-500">
+                <p class="text-sm text-yellow-400 uppercase tracking-widest mb-1">Your Current Score</p>
+                <p class="text-3xl font-bold text-white" id="shop-score-display">0</p>
+            </div>
+
+            <div class="space-y-3">
+                <button onclick="buyContinue()" id="buy-btn" class="w-full bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-500 hover:to-teal-500 text-white font-bold py-4 px-6 rounded-xl shadow-lg border-2 border-green-400">
+                    <div class="flex items-center justify-between">
+                        <span><i class="fas fa-heart text-red-400 mr-2"></i> Refill Hearts</span>
+                        <span class="bg-black bg-opacity-30 px-2 py-1 rounded text-sm">-500 Pts</span>
+                    </div>
+                </button>
+                
+                <button onclick="giveUp()" class="w-full bg-transparent border border-gray-600 text-gray-400 hover:text-white hover:border-white py-3 rounded-lg text-sm">
+                    No thanks, I'll end here.
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Teacher Portal -->
+    <div id="teacher-portal" class="hidden min-h-screen p-4 md:p-8 bg-gray-900">
+        <div class="max-w-4xl mx-auto">
+            <div class="flex justify-between items-center mb-8">
+                <h2 class="text-2xl font-bold text-yellow-400"><i class="fas fa-chart-line mr-2"></i> Teacher Dashboard</h2>
+                <div class="flex gap-2">
+                     <button onclick="showInstructions()" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg"><i class="fas fa-share-alt mr-2"></i> Setup Guide</button>
+                    <button onclick="closeTeacherPortal()" class="bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded-lg">Exit</button>
+                </div>
+            </div>
+            
+            <div class="card p-6 overflow-x-auto">
+                <table class="w-full text-sm dashboard-table">
+                    <thead>
+                        <tr><th>Student</th><th>Score</th><th>Lvl</th><th>Date</th><th>Analysis</th></tr>
+                    </thead>
+                    <tbody id="results-table-body">
+                        <tr><td colspan="5" class="text-center text-gray-500 py-4">Checking database...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- Analysis Modal -->
+    <div id="analysis-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-50 px-4">
+        <div class="card p-6 max-w-2xl w-full bg-gray-900 border border-purple-500 max-h-[80vh] overflow-y-auto">
+            <div class="flex justify-between items-start mb-4">
+                <div>
+                    <h3 id="analysis-student-name" class="text-xl font-bold text-white">Student Analysis</h3>
+                    <p class="text-xs text-gray-400">Powered by Gemini AI</p>
+                </div>
+                <button onclick="closeAnalysis()" class="text-gray-400 hover:text-white"><i class="fas fa-times text-xl"></i></button>
+            </div>
+            <div id="analysis-content" class="text-sm text-gray-300 space-y-4"></div>
+        </div>
+    </div>
+    
+    <!-- Instructions Modal -->
+    <div id="instructions-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-50 px-4">
+        <div class="card p-6 max-w-lg w-full bg-gray-900 border border-blue-500">
+            <h3 class="text-xl font-bold text-white mb-4">Setup for Home Learning</h3>
+            <ol class="list-decimal list-inside text-sm text-gray-300 space-y-3 mb-6">
+                <li><strong>Download:</strong> Save this file as <code>ratio_game.html</code>.</li>
+                <li><strong>Auto-Fill Form (Recommended):</strong>
+                    <ul class="list-disc list-inside ml-4 text-xs mt-1 text-gray-400">
+                        <li>Create a Google Form (Name, Score, Level).</li>
+                        <li>Use "Get pre-filled link" to find the Entry IDs (e.g. entry.12345).</li>
+                        <li>Edit this file and paste the IDs into the <code>TEACHER CONFIGURATION</code> section at the top.</li>
+                    </ul>
+                </li>
+                <li><strong>Email Backup:</strong> Simply add your email to <code>TEACHER_EMAIL</code> in the config.</li>
+                <li><strong>Distribute:</strong> Send the file to students!</li>
+            </ol>
+            <button onclick="document.getElementById('instructions-modal').classList.add('hidden')" class="w-full bg-blue-600 text-white font-bold py-2 rounded-lg">Got it</button>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="hidden fixed inset-0 bg-black bg-opacity-80 flex flex-col items-center justify-center">
+        <i class="fas fa-spinner fa-spin text-5xl text-purple-500 mb-4"></i>
+        <p class="text-white font-bold text-lg pixel-font">Summoning...</p>
+    </div>
+
+    <!-- Game Screen -->
+    <div id="game-screen" class="hidden min-h-screen flex flex-col items-center justify-start pt-4 pb-12">
+        <div class="w-full max-w-2xl px-4 mb-6 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <div class="bg-gray-800 p-2 rounded-lg border border-gray-600">
+                    <span class="text-xs text-gray-400 block">LEVEL</span>
+                    <span id="level-display" class="font-bold text-yellow-400">1</span>
+                </div>
+                <div class="bg-gray-800 p-2 rounded-lg border border-gray-600 min-w-[80px]">
+                    <span class="text-xs text-gray-400 block">SCORE</span>
+                    <span id="score-display" class="font-bold text-green-400">0</span>
+                </div>
+            </div>
+            <div class="flex items-center">
+                <div class="flex space-x-1" id="hearts-container"></div>
+            </div>
+        </div>
+
+        <div class="w-full max-w-2xl px-4">
+            <div id="question-card" class="card p-6 md:p-8 relative">
+                <div class="absolute -top-4 left-6 bg-blue-600 text-white text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wider shadow-lg" id="question-tag">Category</div>
+                
+                <button onclick="askSage()" id="sage-btn" class="absolute -top-4 right-6 ai-btn text-white text-xs font-bold px-4 py-2 rounded-full uppercase tracking-wider shadow-lg flex items-center gap-2 transition-all">
+                    <i class="fas fa-magic"></i> Ask the Sage
+                </button>
+
+                <div id="sage-area" class="hidden mb-6 sage-box p-4 rounded-lg text-sm text-pink-100 relative mt-6">
+                    <div class="flex items-start gap-3">
+                        <i class="fas fa-hat-wizard text-2xl text-pink-400"></i>
+                        <div class="flex-1">
+                            <p class="font-bold text-pink-400 mb-1">The Sage Says:</p>
+                            <p id="sage-text" class="italic"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mb-8 mt-6">
+                    <p id="question-text" class="text-lg md:text-xl font-bold leading-relaxed text-center"></p>
+                </div>
+
+                <div id="options-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+
+                <div id="feedback-area" class="mt-6 hidden">
+                    <div id="feedback-message" class="p-4 rounded-lg mb-4 font-bold text-center"></div>
+                    <div id="explanation-box" class="bg-gray-800 p-4 rounded-lg text-sm text-gray-200 border-l-4 border-yellow-400">
+                        <p class="font-bold text-yellow-400 mb-1">Solution:</p>
+                        <p id="explanation-text"></p>
+                    </div>
+                    
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-4">
+                        <button id="generate-btn" onclick="generateSimilarQuestion()" class="ai-btn text-white font-bold py-3 px-6 rounded-lg shadow-lg flex items-center justify-center gap-2">
+                            <i class="fas fa-plus-circle"></i> Similar Question
+                        </button>
+                        <button id="next-btn" onclick="nextQuestion()" class="bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-6 rounded-lg shadow-lg flex items-center justify-center gap-2">
+                            Next Question <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- End Modal (Game Over) -->
+    <div id="end-modal" class="hidden fixed inset-0 modal-overlay flex items-center justify-center z-50 px-4">
+        <div class="card p-8 max-w-md w-full text-center bg-gray-900 border-2 border-purple-500">
+            <div id="end-icon" class="text-6xl mb-4"><i class="fas fa-graduation-cap text-yellow-400"></i></div>
+            <h2 id="end-title" class="text-3xl font-bold mb-2 pixel-font text-white">QUIZ COMPLETED!</h2>
+            <p id="end-message" class="text-gray-300 mb-6">Well done on finishing the assignment!</p>
+            <div class="bg-gray-800 rounded-lg p-4 mb-6">
+                <div class="text-sm text-gray-400">FINAL SCORE</div>
+                <div id="final-score" class="text-4xl font-bold text-yellow-400">0</div>
+            </div>
+            
+            <div id="player-stats-display" class="mb-6 p-3 bg-gray-800 rounded border border-gray-600 text-sm">
+                <p><i class="fas fa-history text-blue-400"></i> Attempts: <span id="end-attempts" class="font-bold text-white">...</span></p>
+                <p><i class="fas fa-trophy text-yellow-400"></i> Rank: <span id="end-rank" class="font-bold text-white">...</span></p>
+            </div>
+            
+            <div id="save-status" class="text-xs text-gray-400 mb-4 space-y-2"></div>
+            
+            <!-- Dynamic Buttons Area -->
+            <div id="submission-buttons" class="space-y-3 mb-6"></div>
+            
+            <div class="flex gap-2">
+                <button onclick="showLeaderboard()" class="w-1/2 bg-gray-700 hover:bg-gray-600 text-yellow-400 font-bold py-3 px-4 rounded-lg border border-gray-500">
+                    <i class="fas fa-trophy"></i> Ranks
+                </button>
+                <button onclick="location.reload()" class="w-1/2 bg-blue-600 hover:bg-blue-500 text-white font-bold py-3 px-4 rounded-lg">
+                    Menu
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const apiKey = ""; // Environment provided
+
+        // --- Question Database (25 Questions) ---
+        const questions = [
+            // Level 1: Foundations
+            { level: 1, category: "Simplification", text: "Express 12 : 16 in simplest form.", options: ["3:4", "4:3", "6:8", "2:3"], correctIndex: 0, explanation: "Divide both numbers by 4." },
+            { level: 1, category: "Missing Value", text: "2 : 5 = ? : 15", options: ["6", "10", "5", "4"], correctIndex: 0, explanation: "5 x 3 = 15, so 2 x 3 = 6." },
+            { level: 1, category: "Ordering", text: "8 Boys, 12 Girls. Ratio of Girls to Boys?", options: ["2:3", "3:2", "8:12", "4:6"], correctIndex: 1, explanation: "Girls:Boys = 12:8. Simplify to 3:2." },
+            { level: 1, category: "Units", text: "Express 30cm : 1m as a ratio.", options: ["30:1", "3:1", "3:10", "30:100"], correctIndex: 2, explanation: "Convert 1m to 100cm. 30:100 = 3:10." },
+            { level: 1, category: "Simplification", text: "Express 18 : 27 in simplest form.", options: ["2:3", "3:2", "6:9", "9:6"], correctIndex: 0, explanation: "Divide both by 9." },
+
+            // Level 2: Ratio, Fraction & Percentage
+            { level: 2, category: "Ratio to Fraction", text: "Red:Blue = 5:7. Fraction of balls that are Red?", options: ["5/7", "7/5", "5/12", "7/12"], correctIndex: 2, explanation: "Red/Total = 5/(5+7) = 5/12." },
+            { level: 2, category: "Perc to Ratio", text: "40% are Boys. Ratio Girls:Boys?", options: ["2:3", "3:2", "4:6", "60:40"], correctIndex: 1, explanation: "60% Girls, 40% Boys. 60:40 = 3:2." },
+            { level: 2, category: "Fraction to Ratio", text: "James has 2/3 as many stickers as Ali. James:Ali?", options: ["2:3", "3:2", "2:1", "1:3"], correctIndex: 0, explanation: "Numerator (2) is James, Denom (3) is Ali." },
+            { level: 2, category: "Grouping", text: "Adults:Children 2:3. Girls:Boys 4:1. Adults:Girls?", options: ["2:4", "5:6", "5:4", "10:12"], correctIndex: 1, explanation: "Children 5u total. LCM(3,5)=15. Adults:Child=10:15. Child(G:B)=12:3. Adults:Girls = 10:12 = 5:6." },
+            { level: 2, category: "Ratio to Fraction", text: "Recipe uses 3 cups flour for 2 cups sugar. Fraction of mix is sugar?", options: ["2/5", "3/5", "2/3", "3/2"], correctIndex: 0, explanation: "Total 5 parts. Sugar is 2/5." },
+
+            // Level 3: Repeated Identity
+            { level: 3, category: "Repeated Identity", text: "A:B = 2:3, B:C = 3:5. Find A:B:C", options: ["2:3:5", "2:6:5", "6:9:15", "2:1:5"], correctIndex: 0, explanation: "B is 3 in both. Combine directly." },
+            { level: 3, category: "Repeated Identity", text: "A:B = 1:2, B:C = 4:5. Find A:B:C", options: ["1:2:5", "2:4:5", "1:4:5", "4:8:5"], correctIndex: 1, explanation: "Make B=4. A:B becomes 2:4. Combined 2:4:5." },
+            { level: 3, category: "Repeated Identity", text: "Alice:Bernice 3:4. Bernice:Clarissa 2:5. Alice:Clarissa?", options: ["3:5", "3:10", "6:20", "3:8"], correctIndex: 1, explanation: "B is 4 and 2. LCM=4. B:C -> 4:10. A:B:C = 3:4:10. A:C = 3:10." },
+            { level: 3, category: "Equalizing Totals", text: "Box A Gold:Silver 1:5. Box B 1:2. Totals equal. Gold A : Gold B?", options: ["1:1", "1:2", "2:1", "1:5"], correctIndex: 1, explanation: "Total A=6u, B=3u. Make B 6u -> 2:4. Gold A (1) : Gold B (2)." },
+            { level: 3, category: "Linking 3 Vars", text: "Red:Blue 1:3. Blue:Green 2:1. Red:Green?", options: ["1:1", "2:3", "1:6", "2:1"], correctIndex: 1, explanation: "LCM of Blue (3,2) is 6. R:B=2:6, B:G=6:3. R:G=2:3." },
+
+            // Level 4: Heuristics
+            { level: 4, category: "Constant Total", text: "A:B = 3:2. Ali gives $10 to Ben, now 1:1. Total money?", options: ["$50", "$60", "$100", "$30"], correctIndex: 2, explanation: "Total 5u vs 2u -> 10u (6:4 vs 5:5). Change 1u=$10. Total 10u=$100." },
+            { level: 4, category: "Constant Diff", text: "Dad 40, Son 10. When will ratio be 2:1?", options: ["10 yrs", "20 yrs", "5 yrs", "30 yrs"], correctIndex: 1, explanation: "Diff 30. At 2:1, Diff is 1u. 1u=30. Son is 30. 30-10=20 yrs." },
+            { level: 4, category: "One Unchanged", text: "Red:Blue 4:1. Add 10 Blue -> 2:1. Red pens?", options: ["20", "40", "10", "8"], correctIndex: 1, explanation: "Red same (4). 4:1 -> 4:2. Blue +1u. 1u=10. Red 4u=40." },
+            { level: 4, category: "Constant Total", text: "Jane:May 7:3. Jane gives 20 to May -> 3:2. Jane at first?", options: ["70", "140", "100", "35"], correctIndex: 1, explanation: "Total 10u vs 5u -> 10u (6:4). Jane 7u->6u. 1u=20. Jane 7u=140." },
+            { level: 4, category: "Constant Diff", text: "Adam:Bob 3:1. Both spend $20 -> 5:1. Adam at first?", options: ["$60", "$120", "$90", "$150"], correctIndex: 1, explanation: "Diff 2u vs 4u -> Make 4u (6:2). Adam 6u->5u (1u diff). 1u=$20. Adam 6u=$120." },
+
+            // Level 5: PSLE Advanced (2015-2023)
+            { level: 5, category: "Constant Diff (2015)", text: "Ben $90, Chan $48. Both spend same amount. Ratio left 4:1. Cost of item?", options: ["$34", "$42", "$30", "$14"], correctIndex: 0, explanation: "Diff $42 = 3u. 1u=$14. Chan left $14. $48-$14=$34." },
+            { level: 5, category: "Branching (2023)", text: "Spent 75% on Calc. Spent 40% of remainder on Book. Left $6.90. Total at first?", options: ["$40", "$56", "$46", "$90"], correctIndex: 2, explanation: "Left 60% of 25% = 15% total. 15%=$6.90. 1%=$0.46. Total=$46." },
+            { level: 5, category: "Everything Changed (2020)", text: "Boys:Girls 6:5. Boys +50%, Girls -40%. New Ratio?", options: ["3:1", "9:3", "3:2", "5:4"], correctIndex: 0, explanation: "Assume 60B, 50G. B->90, G->30. Ratio 90:30 = 3:1." },
+            { level: 5, category: "Before & After (2022)", text: "Boys:Girls 2:5. 11 boys enter, half girls leave. Ratio 1:1. Girls at first?", options: ["50", "110", "55", "22"], correctIndex: 1, explanation: "G=5u. Leave->2.5u. B+11=2.5u. (2u+11=2.5u). 0.5u=11. G=5u=110." },
+            { level: 5, category: "Internal Transfer (2018)", text: "Ann 285 beads. Used 45 red, 40% blue. Ratio 1:3. Blue used?", options: ["60", "90", "120", "40"], correctIndex: 2, explanation: "Logic check: 40% is 2/5. Blue must be multiple of 5. Ans: 120." }
+        ];
+
+        let currentStudentName = "";
+        let currentLevel = 1;
+        let score = 0;
+        let hearts = 3;
+        let availableQuestions = [];
+        let currentQuestion = null;
+        let detailedLog = [];
+        let secondChanceActive = false; // For "Second Chance" mechanic
+
+        // UI Helpers
+        window.updateConnectionStatus = (isOnline) => {
+            const statusEl = document.getElementById('connection-status');
+            const btn = document.getElementById('start-btn');
+            statusEl.innerHTML = isOnline ? '<i class="fas fa-wifi text-green-500"></i> Connected to Class' : '<i class="fas fa-signal text-yellow-500"></i> Offline Mode';
+            
+            btn.disabled = false;
+            btn.innerHTML = 'START ADVENTURE';
+            btn.classList.remove('bg-gray-600', 'cursor-not-allowed');
+            btn.classList.add('bg-gradient-to-r', 'from-pink-600', 'to-purple-600', 'hover:from-pink-500', 'hover:to-purple-500', 'transform', 'hover:scale-105');
+        };
+
+        setTimeout(() => {
+            const btn = document.getElementById('start-btn');
+            if (btn.disabled) window.updateConnectionStatus(false);
+        }, 3000);
+
+        function checkNameAndStart() {
+            const name = document.getElementById('student-name-input').value.trim();
+            if (name.length < 2) { alert("Please enter your name"); return; }
+            currentStudentName = name;
+            startGame();
+        }
+
+        function startGame() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('game-screen').classList.remove('hidden');
+            document.getElementById('game-screen').classList.add('flex');
+            currentLevel = 1; score = 0; hearts = 3; detailedLog = [];
+            updateHUD(); loadLevel(1);
+        }
+
+        function updateHUD() {
+            document.getElementById('level-display').innerText = currentLevel;
+            document.getElementById('score-display').innerText = score;
+            const container = document.getElementById('hearts-container');
+            container.innerHTML = '';
+            for(let i=0; i<3; i++) container.innerHTML += `<i class="fas fa-heart text-xl ${i<hearts ? 'text-red-500' : 'text-gray-600'}"></i>`;
+        }
+
+        function loadLevel(lvl) {
+            currentLevel = lvl;
+            availableQuestions = questions.filter(q => q.level === lvl).sort(() => Math.random() - 0.5);
+            loadNextQuestion();
+        }
+
+        function loadNextQuestion() {
+            if (availableQuestions.length === 0) {
+                if (currentLevel < 5) {
+                    currentLevel++;
+                    loadLevel(currentLevel);
+                } else {
+                    endGame(true);
+                }
+                return;
+            }
+            currentQuestion = availableQuestions.pop();
+            secondChanceActive = true; // Reset second chance for new question
+            renderQuestion(currentQuestion);
+        }
+
+        function renderQuestion(q) {
+            document.getElementById('feedback-area').classList.add('hidden');
+            document.getElementById('options-grid').innerHTML = '';
+            document.getElementById('sage-area').classList.add('hidden');
+            document.getElementById('sage-btn').disabled = false;
+            document.getElementById('sage-btn').innerHTML = '<i class="fas fa-magic"></i> Ask the Sage';
+            
+            document.getElementById('question-tag').innerText = `Level ${currentLevel}: ${q.category}`;
+            document.getElementById('question-text').innerHTML = q.text;
+
+            const grid = document.getElementById('options-grid');
+            q.options.forEach((opt, index) => {
+                const btn = document.createElement('button');
+                btn.className = "option-btn bg-gray-700 hover:bg-gray-600 text-white font-bold py-4 px-6 rounded-xl border-b-4 border-gray-900 text-lg w-full";
+                btn.innerText = opt;
+                btn.onclick = () => checkAnswer(index, btn);
+                grid.appendChild(btn);
+            });
+        }
+
+        function checkAnswer(index, btnElement) {
+            const isCorrect = index === currentQuestion.correctIndex;
+            
+            // SECOND CHANCE MECHANIC
+            if (!isCorrect && secondChanceActive) {
+                secondChanceActive = false; // Used up chance
+                btnElement.disabled = true;
+                btnElement.classList.replace('bg-gray-700', 'bg-gray-800');
+                btnElement.classList.add('opacity-50', 'cursor-not-allowed');
+                btnElement.innerText = "Try Again!";
+                
+                // Trigger localized Sage hint
+                const sageArea = document.getElementById('sage-area');
+                sageArea.classList.remove('hidden');
+                document.getElementById('sage-text').innerHTML = "Not quite! Look closer at the order or units. You have <b>one more try</b>!";
+                
+                // Shake effect
+                const card = document.getElementById('question-card');
+                card.classList.add('shake-element');
+                setTimeout(() => card.classList.remove('shake-element'), 500);
+                return; // Exit without penalizing heart yet
+            }
+
+            // Standard Flow (Correct or 2nd wrong)
+            const btns = document.querySelectorAll('.option-btn');
+            btns.forEach(b => b.disabled = true);
+            
+            detailedLog.push({ question: currentQuestion.text, category: currentQuestion.category, isCorrect, studentAnswer: currentQuestion.options[index] });
+
+            document.getElementById('feedback-area').classList.remove('hidden');
+            document.getElementById('explanation-text').innerHTML = currentQuestion.explanation;
+
+            const msg = document.getElementById('feedback-message');
+            if (isCorrect) {
+                // If they used second chance, give half points? (Optional complexity, sticking to full for encouragement)
+                score += 100 * currentLevel;
+                msg.innerText = "Correct!";
+                msg.className = "p-4 rounded-lg mb-4 font-bold text-center bg-green-900 text-green-200 border border-green-500";
+                btns[index].classList.replace('bg-gray-700', 'bg-green-600');
+                if(secondChanceActive === false) btns[index].innerText += " (2nd Try)"; // Visual indicator
+                fireConfetti();
+            } else {
+                hearts--;
+                msg.innerText = "Incorrect.";
+                msg.className = "p-4 rounded-lg mb-4 font-bold text-center bg-red-900 text-red-200 border border-red-500";
+                btns[index].classList.replace('bg-gray-700', 'bg-red-600');
+                btns[currentQuestion.correctIndex].classList.replace('bg-gray-700', 'bg-green-600');
+            }
+            updateHUD();
+            
+            if (hearts <= 0) {
+                // Trigger Shop instead of End Game
+                setTimeout(showShop, 1500);
+            }
+        }
+
+        function showShop() {
+            document.getElementById('shop-modal').classList.remove('hidden');
+            document.getElementById('shop-score-display').innerText = score;
+            const buyBtn = document.getElementById('buy-btn');
+            
+            if (score >= 500) {
+                buyBtn.disabled = false;
+                buyBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+            } else {
+                buyBtn.disabled = true;
+                buyBtn.classList.add('opacity-50', 'cursor-not-allowed');
+                buyBtn.innerHTML = `<span><i class="fas fa-lock mr-2"></i> Not enough points</span><span>Need 500</span>`;
+            }
+        }
+
+        function buyContinue() {
+            if (score >= 500) {
+                score -= 500;
+                hearts = 3; // Refill
+                updateHUD();
+                document.getElementById('shop-modal').classList.add('hidden');
+                // Resume
+                loadNextQuestion(); 
+            }
+        }
+
+        function giveUp() {
+            document.getElementById('shop-modal').classList.add('hidden');
+            endGame(false);
+        }
+
+        function nextQuestion() { if (hearts > 0) loadNextQuestion(); }
+
+        async function endGame(victory) {
+            document.getElementById('game-screen').classList.add('hidden');
+            document.getElementById('end-modal').classList.remove('hidden');
+            
+            document.getElementById('end-title').innerText = victory ? "VICTORY!" : "GAME OVER";
+            document.getElementById('end-icon').innerHTML = victory ? '<i class="fas fa-trophy text-yellow-400"></i>' : '<i class="fas fa-heart-broken text-red-500"></i>';
+            document.getElementById('end-message').innerText = victory ? "You mastered the Syllabus!" : "Keep practicing!";
+            document.getElementById('final-score').innerText = score;
+
+            const saveMsg = document.getElementById('save-status');
+            const btnContainer = document.getElementById('submission-buttons');
+            btnContainer.innerHTML = ''; 
+            
+            if (window.saveStudentResult && window.firebaseState.isOnline) {
+                saveMsg.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+                const success = await window.saveStudentResult(currentStudentName, score, currentLevel, detailedLog);
+                if (success) {
+                    saveMsg.innerHTML = '<i class="fas fa-check-circle text-green-500"></i> Saved to Database';
+                    if (window.listenToResults) {
+                        window.listenToResults((results) => {
+                            const stats = processLeaderboard(results);
+                            const myStat = stats.find(s => s.name.toLowerCase() === currentStudentName.toLowerCase());
+                            if(myStat) {
+                                document.getElementById('end-attempts').innerText = myStat.attempts;
+                                const rank = stats.indexOf(myStat) + 1;
+                                document.getElementById('end-rank').innerText = `#${rank}`;
+                            }
+                        });
+                    }
+                } else {
+                    saveMsg.innerHTML = '<i class="fas fa-exclamation-circle text-yellow-500"></i> Offline - Result Local Only';
+                    document.getElementById('end-attempts').innerText = "Offline";
+                    document.getElementById('end-rank').innerText = "-";
+                }
+            } else {
+                saveMsg.innerHTML = '<span class="text-gray-500">Mode: Offline / Local File</span>';
+            }
+            
+            const conf = window.teacherConfig;
+            if (conf.formUrl && conf.formUrl.length > 5) {
+                let finalUrl = conf.formUrl;
+                if(conf.entryName || conf.entryScore) {
+                    const separator = finalUrl.includes('?') ? '&' : '?';
+                    const params = [];
+                    if(conf.entryName) params.push(`entry.${conf.entryName}=${encodeURIComponent(currentStudentName)}`);
+                    if(conf.entryScore) params.push(`entry.${conf.entryScore}=${score}`);
+                    if(conf.entryLevel) params.push(`entry.${conf.entryLevel}=${currentLevel}`);
+                    finalUrl += separator + params.join('&');
+                }
+                const formBtn = document.createElement('a');
+                formBtn.href = finalUrl; formBtn.target = "_blank";
+                formBtn.className = "block w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-6 rounded-lg flex items-center justify-center gap-2";
+                formBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit to Teacher (Auto-Fill)';
+                btnContainer.appendChild(formBtn);
+            }
+
+            if (conf.email && conf.email.length > 3) {
+                const subject = `Ratio Rescue Result: ${currentStudentName}`;
+                const body = `Student: ${currentStudentName}%0D%0AScore: ${score}%0D%0AMax Level: ${currentLevel}%0D%0A%0D%0A(Generated by Ratio Rescue)`;
+                const mailto = `mailto:${conf.email}?subject=${encodeURIComponent(subject)}&body=${body}`;
+                const emailBtn = document.createElement('a');
+                emailBtn.href = mailto;
+                emailBtn.className = "block w-full bg-blue-500 hover:bg-blue-400 text-white font-bold py-3 px-6 rounded-lg flex items-center justify-center gap-2";
+                emailBtn.innerHTML = '<i class="fas fa-envelope"></i> Email Result';
+                btnContainer.appendChild(emailBtn);
+            }
+        }
+        
+        function showLeaderboard() {
+            document.getElementById('leaderboard-modal').classList.remove('hidden');
+            const tbody = document.getElementById('leaderboard-body');
+            tbody.innerHTML = '<tr><td colspan="4" class="text-center py-8"><i class="fas fa-spinner fa-spin text-2xl text-purple-500"></i><br>Summoning Records...</td></tr>';
+            
+            if (window.listenToResults) {
+                window.listenToResults((results) => {
+                    if(!results || results.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">No records found. Be the first!</td></tr>';
+                        return;
+                    }
+                    const leaderboardData = processLeaderboard(results);
+                    renderLeaderboard(leaderboardData);
+                });
+            } else {
+                 tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">Offline. Connect to view.</td></tr>';
+            }
+        }
+        
+        function processLeaderboard(results) {
+            const stats = {};
+            results.forEach(r => {
+                const name = r.studentName.trim();
+                if(!stats[name]) {
+                    stats[name] = { name: name, bestScore: 0, attempts: 0 };
+                }
+                stats[name].attempts++;
+                if(r.score > stats[name].bestScore) stats[name].bestScore = r.score;
+            });
+            return Object.values(stats).sort((a,b) => b.bestScore - a.bestScore);
+        }
+        
+        function renderLeaderboard(data) {
+             const tbody = document.getElementById('leaderboard-body');
+             tbody.innerHTML = '';
+             data.forEach((entry, index) => {
+                 const tr = document.createElement('tr');
+                 let rankClass = '';
+                 let rankIcon = '';
+                 if(index === 0) { rankClass = 'gold-row'; rankIcon = '<i class="fas fa-crown text-yellow-500"></i>'; }
+                 else if(index === 1) { rankClass = 'silver-row'; rankIcon = '<i class="fas fa-medal text-gray-400"></i>'; }
+                 else if(index === 2) { rankClass = 'bronze-row'; rankIcon = '<i class="fas fa-medal text-yellow-700"></i>'; }
+                 tr.className = rankClass;
+                 tr.innerHTML = `<td class="font-bold">${rankIcon || (index + 1)}</td><td class="font-bold text-white">${entry.name}</td><td class="font-mono text-green-400">${entry.bestScore}</td><td class="text-gray-400 text-center">${entry.attempts}</td>`;
+                 tbody.appendChild(tr);
+             });
+        }
+        
+        function closeLeaderboard() { document.getElementById('leaderboard-modal').classList.add('hidden'); }
+
+        function openTeacherPortal() {
+            document.getElementById('start-screen').classList.add('hidden');
+            document.getElementById('teacher-portal').classList.remove('hidden');
+            loadResults();
+        }
+
+        function closeTeacherPortal() {
+            document.getElementById('teacher-portal').classList.add('hidden');
+            document.getElementById('start-screen').classList.remove('hidden');
+        }
+
+        function showInstructions() { document.getElementById('instructions-modal').classList.remove('hidden'); }
+
+        function loadResults() {
+            const tbody = document.getElementById('results-table-body');
+            tbody.innerHTML = '<tr><td colspan="5" class="text-center py-4"><i class="fas fa-spinner fa-spin"></i> Loading...</td></tr>';
+            if (window.listenToResults) {
+                window.listenToResults((results) => {
+                    tbody.innerHTML = '';
+                    if (!results || results.length === 0) { tbody.innerHTML = '<tr><td colspan="5" class="text-center text-gray-500 py-4">No data or Offline.</td></tr>'; return; }
+                    results.forEach((r, i) => {
+                        const date = r.timestamp ? new Date(r.timestamp.seconds * 1000).toLocaleDateString() : 'Just now';
+                        const tr = document.createElement('tr');
+                        
+                        // We store the data in a hidden attribute instead of inline onclick for safer handling
+                        tr.dataset.studentInfo = JSON.stringify(r);
+                        
+                        tr.innerHTML = `
+                            <td class="font-bold text-white">${r.studentName}</td>
+                            <td class="text-green-400 font-mono">${r.score}</td>
+                            <td>Lvl ${r.maxLevelReached}</td>
+                            <td class="text-gray-400 text-xs">${date}</td>
+                            <td><button class="ai-coach-btn bg-purple-600 hover:bg-purple-500 text-white text-xs px-3 py-1 rounded" data-index="${i}"><i class="fas fa-robot"></i> AI Coach</button></td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                    
+                    // Attach event listeners dynamically
+                    document.querySelectorAll('.ai-coach-btn').forEach(btn => {
+                        btn.addEventListener('click', (e) => {
+                            const tr = e.target.closest('tr');
+                            const data = JSON.parse(tr.dataset.studentInfo);
+                            analyzeStudent(data);
+                        });
+                    });
+                });
+            }
+        }
+
+        async function analyzeStudent(studentData) {
+            const modal = document.getElementById('analysis-modal');
+            const content = document.getElementById('analysis-content');
+            document.getElementById('analysis-student-name').innerText = `Analysis: ${studentData.studentName}`;
+            modal.classList.remove('hidden');
+            content.innerHTML = '<div class="flex flex-col items-center justify-center py-8"><i class="fas fa-spinner fa-spin text-4xl text-purple-500 mb-4"></i><p>Generating personalized report...</p></div>';
+            
+            const mistakes = studentData.details.filter(d => !d.isCorrect);
+            const prompt = `Act as a supportive Singapore Math Teacher analyzing a student's performance. 
+            Student: ${studentData.studentName}. Score: ${studentData.score}. Level: ${studentData.maxLevelReached}.
+            Mistakes: ${JSON.stringify(mistakes.map(m => ({ category: m.category, question: m.question })))}
+            
+            Provide a performance review with these 3 sections in valid HTML:
+            <h3>1. Weakness Identification</h3>
+            <p>Briefly explain the main concept they struggled with based on the mistakes.</p>
+            <h3>2. Concept Review</h3>
+            <p>Explain the correct method simply (e.g. "Remember to make units the same").</p>
+            <h3>3. Encouragement</h3>
+            <p>A positive closing remark.</p>
+            
+            IMPORTANT: Do not use LaTeX formatting (like $30\text{cm}$). Use plain text (e.g. "30 cm") for units. Do not use Markdown (no **bold** or # headings), use HTML tags <b>, <strong>, <ul>, <li> instead.`;
+
+            const result = await callGemini(prompt);
+            content.innerHTML = result || "<p class='text-red-400'>Analysis failed. Please try again.</p>";
+        }
+
+        function closeAnalysis() { document.getElementById('analysis-modal').classList.add('hidden'); }
+
+        async function callGemini(promptText) {
+            // Note: In this specific environment, we rely on the injected key.
+            // If the key is missing/empty, the request will likely fail with 400/403.
+            // We proceed with the attempt to allow environment-injected keys to work.
+            
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            try {
+                const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] }) });
+                if (!response.ok) throw new Error(response.statusText);
+                const data = await response.json();
+                return data.candidates?.[0]?.content?.parts?.[0]?.text;
+            } catch (e) { 
+                console.error("Gemini Error:", e);
+                return null; 
+            }
+        }
+
+        async function askSage() {
+             const btn = document.getElementById('sage-btn');
+             btn.disabled = true; btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Thinking...';
+             const prompt = `Help a P6 student with this math question (Hint only, no answer): "${currentQuestion.text}". Options: ${currentQuestion.options.join(', ')}.`;
+             const text = await callGemini(prompt);
+             document.getElementById('sage-area').classList.remove('hidden');
+             document.getElementById('sage-text').innerText = text || "The Sage is silent (Connection Error)...";
+             btn.innerHTML = '<i class="fas fa-check"></i> Sage Spoken';
+        }
+
+        async function generateSimilarQuestion() {
+            const loading = document.getElementById('loading-overlay'); loading.classList.remove('hidden');
+            const prompt = `Create a unique Singapore Primary 6 Math question about "${currentQuestion.category}". Similar difficulty/logic to: "${currentQuestion.text}". Return valid JSON: { "text": "...", "options": ["..."], "correctIndex": 0, "explanation": "..." }`;
+            const result = await callGemini(prompt);
+            loading.classList.add('hidden');
+            if (result) {
+                try {
+                    const newQ = JSON.parse(result.match(/\{[\s\S]*\}/)[0]);
+                    newQ.level = currentLevel; newQ.category = `${currentQuestion.category} (AI)`;
+                    currentQuestion = newQ; renderQuestion(newQ);
+                } catch (e) { alert("Sage Error."); }
+            } else { alert("Connection Error."); }
+        }
+
+        // FX
+        const canvas = document.getElementById("confetti-canvas");
+        const ctx = canvas.getContext("2d");
+        canvas.width = window.innerWidth; canvas.height = window.innerHeight;
+        let particles = [];
+        function fireConfetti() { for(let i=0; i<50; i++) particles.push({x: window.innerWidth/2, y: window.innerHeight/2, vx:(Math.random()-0.5)*10, vy:(Math.random()-0.5)*10, color:`hsl(${Math.random()*360},100%,50%)`, life:100}); requestAnimationFrame(updateConfetti); }
+        function updateConfetti() { ctx.clearRect(0,0,canvas.width,canvas.height); particles.forEach((p,i) => { p.x+=p.vx; p.y+=p.vy; p.vy+=0.2; p.life--; ctx.fillStyle=p.color; ctx.beginPath(); ctx.arc(p.x,p.y,3,0,Math.PI*2); ctx.fill(); if(p.life<=0) particles.splice(i,1); }); if(particles.length>0) requestAnimationFrame(updateConfetti); }
+        window.addEventListener('resize', ()=>{ canvas.width=window.innerWidth; canvas.height=window.innerHeight; });
+    </script>
+</body>
+</html>
