@@ -12,13 +12,15 @@
         //  TEACHER CONFIGURATION AREA
         // ==========================================================================================
         
-        // Google Form Base Link
-        const FORM_BASE_URL     = "https://docs.google.com/forms/d/e/1FAIpQLScSVH5G5QVKCtmbbtt08CHX9--ecu5ZfO2ZHAC03hGPR_FCPw/viewform"; 
+        // Google Form Base Link (Corrected for POST submission)
+        // Original: .../viewform?usp=pp_url
+        // Adjusted for silent submission: .../formResponse
+        const FORM_ACTION_URL   = "https://docs.google.com/forms/d/e/1FAIpQLScSVH5G5QVKCtmbbtt08CHX9--ecu5ZfO2ZHAC03hGPR_FCPw/formResponse"; 
         
-        // Auto-Fill Entry IDs (Extracted from your link)
-        const ENTRY_ID_NAME     = "1376623119"; 
-        const ENTRY_ID_SCORE    = "2032202022"; 
-        const ENTRY_ID_LEVEL    = "1918358329"; 
+        // Entry IDs
+        const ENTRY_ID_NAME     = "entry.1376623119"; 
+        const ENTRY_ID_SCORE    = "entry.2032202022"; 
+        const ENTRY_ID_LEVEL    = "entry.1918358329"; 
 
         // Teacher Email
         const TEACHER_EMAIL     = "newtonlabtuition@gmail.com"; 
@@ -29,8 +31,9 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
+        // Expose config to window
         window.teacherConfig = {
-            formUrl: FORM_BASE_URL,
+            formAction: FORM_ACTION_URL,
             entryName: ENTRY_ID_NAME,
             entryScore: ENTRY_ID_SCORE,
             entryLevel: ENTRY_ID_LEVEL,
@@ -128,6 +131,14 @@
 <body>
 
     <canvas id="confetti-canvas"></canvas>
+
+    <!-- Hidden Form for Auto-Submission -->
+    <iframe name="hidden_iframe" id="hidden_iframe" style="display:none;"></iframe>
+    <form action="" method="post" target="hidden_iframe" id="google-form" style="display:none;">
+        <input type="text" name="" id="form-name">
+        <input type="text" name="" id="form-score">
+        <input type="text" name="" id="form-level">
+    </form>
 
     <!-- Main Menu Screen -->
     <div id="start-screen" class="min-h-screen flex flex-col items-center justify-center p-4 text-center">
@@ -292,7 +303,12 @@
                     <span id="score-display" class="font-bold text-green-400">0</span>
                 </div>
             </div>
-            <div class="flex items-center">
+            
+            <div class="flex items-center gap-3">
+                <div class="bg-gray-800 p-2 px-3 rounded-lg border border-gray-600 flex items-center">
+                    <i class="fas fa-clock text-blue-400 mr-2"></i>
+                    <span id="timer-display" class="font-mono font-bold text-white">00:00</span>
+                </div>
                 <div class="flex space-x-1" id="hearts-container"></div>
             </div>
         </div>
@@ -421,7 +437,11 @@
         let availableQuestions = [];
         let currentQuestion = null;
         let detailedLog = [];
-        let secondChanceActive = false; // For "Second Chance" mechanic
+        let secondChanceActive = false;
+        
+        // Timer Variables
+        let startTime = null;
+        let timerInterval = null;
 
         // UI Helpers
         window.updateConnectionStatus = (isOnline) => {
@@ -452,7 +472,21 @@
             document.getElementById('game-screen').classList.remove('hidden');
             document.getElementById('game-screen').classList.add('flex');
             currentLevel = 1; score = 0; hearts = 3; detailedLog = [];
+            
+            // Start Timer
+            startTime = Date.now();
+            if(timerInterval) clearInterval(timerInterval);
+            timerInterval = setInterval(updateTimer, 1000);
+            
             updateHUD(); loadLevel(1);
+        }
+        
+        function updateTimer() {
+            const now = Date.now();
+            const diff = Math.floor((now - startTime) / 1000);
+            const m = Math.floor(diff / 60).toString().padStart(2, '0');
+            const s = (diff % 60).toString().padStart(2, '0');
+            document.getElementById('timer-display').innerText = `${m}:${s}`;
         }
 
         function updateHUD() {
@@ -480,7 +514,7 @@
                 return;
             }
             currentQuestion = availableQuestions.pop();
-            secondChanceActive = true; // Reset second chance for new question
+            secondChanceActive = true; 
             renderQuestion(currentQuestion);
         }
 
@@ -507,27 +541,23 @@
         function checkAnswer(index, btnElement) {
             const isCorrect = index === currentQuestion.correctIndex;
             
-            // SECOND CHANCE MECHANIC
             if (!isCorrect && secondChanceActive) {
-                secondChanceActive = false; // Used up chance
+                secondChanceActive = false; 
                 btnElement.disabled = true;
                 btnElement.classList.replace('bg-gray-700', 'bg-gray-800');
                 btnElement.classList.add('opacity-50', 'cursor-not-allowed');
                 btnElement.innerText = "Try Again!";
                 
-                // Trigger localized Sage hint
                 const sageArea = document.getElementById('sage-area');
                 sageArea.classList.remove('hidden');
                 document.getElementById('sage-text').innerHTML = "Not quite! Look closer at the order or units. You have <b>one more try</b>!";
                 
-                // Shake effect
                 const card = document.getElementById('question-card');
                 card.classList.add('shake-element');
                 setTimeout(() => card.classList.remove('shake-element'), 500);
-                return; // Exit without penalizing heart yet
+                return; 
             }
 
-            // Standard Flow (Correct or 2nd wrong)
             const btns = document.querySelectorAll('.option-btn');
             btns.forEach(b => b.disabled = true);
             
@@ -538,12 +568,11 @@
 
             const msg = document.getElementById('feedback-message');
             if (isCorrect) {
-                // If they used second chance, give half points? (Optional complexity, sticking to full for encouragement)
                 score += 100 * currentLevel;
                 msg.innerText = "Correct!";
                 msg.className = "p-4 rounded-lg mb-4 font-bold text-center bg-green-900 text-green-200 border border-green-500";
                 btns[index].classList.replace('bg-gray-700', 'bg-green-600');
-                if(secondChanceActive === false) btns[index].innerText += " (2nd Try)"; // Visual indicator
+                if(secondChanceActive === false) btns[index].innerText += " (2nd Try)"; 
                 fireConfetti();
             } else {
                 hearts--;
@@ -555,7 +584,6 @@
             updateHUD();
             
             if (hearts <= 0) {
-                // Trigger Shop instead of End Game
                 setTimeout(showShop, 1500);
             }
         }
@@ -578,10 +606,9 @@
         function buyContinue() {
             if (score >= 500) {
                 score -= 500;
-                hearts = 3; // Refill
+                hearts = 3; 
                 updateHUD();
                 document.getElementById('shop-modal').classList.add('hidden');
-                // Resume
                 loadNextQuestion(); 
             }
         }
@@ -594,6 +621,7 @@
         function nextQuestion() { if (hearts > 0) loadNextQuestion(); }
 
         async function endGame(victory) {
+            clearInterval(timerInterval);
             document.getElementById('game-screen').classList.add('hidden');
             document.getElementById('end-modal').classList.remove('hidden');
             
@@ -606,11 +634,16 @@
             const btnContainer = document.getElementById('submission-buttons');
             btnContainer.innerHTML = ''; 
             
+            let saveSuccess = false;
+            
+            // 1. Firebase Save
             if (window.saveStudentResult && window.firebaseState.isOnline) {
                 saveMsg.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
                 const success = await window.saveStudentResult(currentStudentName, score, currentLevel, detailedLog);
                 if (success) {
                     saveMsg.innerHTML = '<i class="fas fa-check-circle text-green-500"></i> Saved to Database';
+                    saveSuccess = true;
+                    // Get Stats
                     if (window.listenToResults) {
                         window.listenToResults((results) => {
                             const stats = processLeaderboard(results);
@@ -631,24 +664,43 @@
                 saveMsg.innerHTML = '<span class="text-gray-500">Mode: Offline / Local File</span>';
             }
             
+            // 2. Auto-Submit Google Form (Silent)
             const conf = window.teacherConfig;
-            if (conf.formUrl && conf.formUrl.length > 5) {
-                let finalUrl = conf.formUrl;
-                if(conf.entryName || conf.entryScore) {
-                    const separator = finalUrl.includes('?') ? '&' : '?';
-                    const params = [];
-                    if(conf.entryName) params.push(`entry.${conf.entryName}=${encodeURIComponent(currentStudentName)}`);
-                    if(conf.entryScore) params.push(`entry.${conf.entryScore}=${score}`);
-                    if(conf.entryLevel) params.push(`entry.${conf.entryLevel}=${currentLevel}`);
-                    finalUrl += separator + params.join('&');
+            if (conf.formAction && conf.entryName) {
+                try {
+                    // Populate hidden form
+                    document.getElementById('form-name').name = conf.entryName;
+                    document.getElementById('form-name').value = currentStudentName;
+                    
+                    document.getElementById('form-score').name = conf.entryScore;
+                    document.getElementById('form-score').value = score;
+                    
+                    document.getElementById('form-level').name = conf.entryLevel;
+                    document.getElementById('form-level').value = currentLevel;
+                    
+                    document.getElementById('google-form').action = conf.formAction;
+                    
+                    // Submit!
+                    document.getElementById('google-form').submit();
+                    
+                    const autoMsg = document.createElement('div');
+                    autoMsg.className = "text-green-400 text-xs mt-2";
+                    autoMsg.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Sent to Google Forms';
+                    saveMsg.appendChild(autoMsg);
+                    
+                } catch(e) {
+                    console.error("Auto-submit failed", e);
+                    // Fallback button if auto-fail
+                    const fallbackBtn = document.createElement('a');
+                    fallbackBtn.href = conf.formAction.replace("formResponse", "viewform");
+                    fallbackBtn.target = "_blank";
+                    fallbackBtn.className = "block w-full bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 px-6 rounded-lg flex items-center justify-center gap-2";
+                    fallbackBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Manual Submit (Backup)';
+                    btnContainer.appendChild(fallbackBtn);
                 }
-                const formBtn = document.createElement('a');
-                formBtn.href = finalUrl; formBtn.target = "_blank";
-                formBtn.className = "block w-full bg-green-600 hover:bg-green-500 text-white font-bold py-3 px-6 rounded-lg flex items-center justify-center gap-2";
-                formBtn.innerHTML = '<i class="fas fa-paper-plane"></i> Submit to Teacher (Auto-Fill)';
-                btnContainer.appendChild(formBtn);
             }
 
+            // 3. Email Button (Always keep as backup)
             if (conf.email && conf.email.length > 3) {
                 const subject = `Ratio Rescue Result: ${currentStudentName}`;
                 const body = `Student: ${currentStudentName}%0D%0AScore: ${score}%0D%0AMax Level: ${currentLevel}%0D%0A%0D%0A(Generated by Ratio Rescue)`;
@@ -734,10 +786,7 @@
                     results.forEach((r, i) => {
                         const date = r.timestamp ? new Date(r.timestamp.seconds * 1000).toLocaleDateString() : 'Just now';
                         const tr = document.createElement('tr');
-                        
-                        // We store the data in a hidden attribute instead of inline onclick for safer handling
                         tr.dataset.studentInfo = JSON.stringify(r);
-                        
                         tr.innerHTML = `
                             <td class="font-bold text-white">${r.studentName}</td>
                             <td class="text-green-400 font-mono">${r.score}</td>
@@ -747,8 +796,6 @@
                         `;
                         tbody.appendChild(tr);
                     });
-                    
-                    // Attach event listeners dynamically
                     document.querySelectorAll('.ai-coach-btn').forEach(btn => {
                         btn.addEventListener('click', (e) => {
                             const tr = e.target.closest('tr');
@@ -789,10 +836,6 @@
         function closeAnalysis() { document.getElementById('analysis-modal').classList.add('hidden'); }
 
         async function callGemini(promptText) {
-            // Note: In this specific environment, we rely on the injected key.
-            // If the key is missing/empty, the request will likely fail with 400/403.
-            // We proceed with the attempt to allow environment-injected keys to work.
-            
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
             try {
                 const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] }) });
