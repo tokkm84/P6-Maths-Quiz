@@ -568,8 +568,9 @@
 
             const msg = document.getElementById('feedback-message');
             if (isCorrect) {
-                score += 100 * currentLevel;
-                msg.innerText = "Correct!";
+                const points = secondChanceActive ? 100 : 50;
+                score += points * currentLevel;
+                msg.innerText = secondChanceActive ? "Correct!" : "Correct! (+Half Points)";
                 msg.className = "p-4 rounded-lg mb-4 font-bold text-center bg-green-900 text-green-200 border border-green-500";
                 btns[index].classList.replace('bg-gray-700', 'bg-green-600');
                 if(secondChanceActive === false) btns[index].innerText += " (2nd Try)"; 
