@@ -641,11 +641,13 @@
         async function endGame(victory) {
             clearInterval(timerInterval);
             
-            // Mathematically calculate the final time directly from the timestamps (bulletproof method)
+            // Mathematically calculate the final time directly from the timestamps
             const finalDiff = Math.floor((Date.now() - startTime) / 1000);
             const finalM = Math.floor(finalDiff / 60).toString().padStart(2, '0');
             const finalS = (finalDiff % 60).toString().padStart(2, '0');
-            const finalTime = `${finalM}:${finalS}`;
+            
+            // Format clearly (e.g., "05m 30s") so Google Forms treats it as simple text
+            const finalTime = `${finalM}m ${finalS}s`;
 
             document.getElementById('game-screen').classList.add('hidden');
             document.getElementById('end-modal').classList.remove('hidden');
@@ -661,7 +663,7 @@
             
             let saveSuccess = false;
             
-            // 1. Firebase Save (Now explicitly using provided keys and adding finalTime)
+            // 1. Firebase Save
             if (window.saveStudentResult && window.firebaseState.isOnline) {
                 saveMsg.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
                 const success = await window.saveStudentResult(currentStudentName, score, currentLevel, finalTime, detailedLog);
@@ -689,38 +691,29 @@
                 saveMsg.innerHTML = '<span class="text-gray-500">Mode: Offline / Local File</span>';
             }
             
-            // 2. Auto-Submit Google Form (Silent)
+            // 2. Auto-Submit Google Form (Silent Fetch)
             const conf = window.teacherConfig;
             if (conf.formAction && conf.entryName) {
-                try {
-                    // Populate hidden form
-                    document.getElementById('form-name').name = conf.entryName;
-                    document.getElementById('form-name').value = currentStudentName;
-                    
-                    document.getElementById('form-score').name = conf.entryScore;
-                    document.getElementById('form-score').value = score;
-                    
-                    document.getElementById('form-level').name = conf.entryLevel;
-                    document.getElementById('form-level').value = currentLevel;
-
-                    if (conf.entryTime) {
-                        document.getElementById('form-time').name = conf.entryTime;
-                        document.getElementById('form-time').value = finalTime;
-                    }
-                    
-                    document.getElementById('google-form').action = conf.formAction;
-                    
-                    // Submit!
-                    document.getElementById('google-form').submit();
-                    
+                const formData = new URLSearchParams();
+                formData.append(conf.entryName, currentStudentName);
+                formData.append(conf.entryScore, score);
+                formData.append(conf.entryLevel, currentLevel);
+                if (conf.entryTime) formData.append(conf.entryTime, finalTime);
+                
+                // Uses a direct HTTP push which is much more reliable than hidden iframes
+                fetch(conf.formAction, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: formData.toString()
+                }).then(() => {
                     const autoMsg = document.createElement('div');
                     autoMsg.className = "text-green-400 text-xs mt-2";
                     autoMsg.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Sent to Google Forms';
                     saveMsg.appendChild(autoMsg);
-                    
-                } catch(e) {
+                }).catch((e) => {
                     console.error("Auto-submit failed", e);
-                    // Fallback button if auto-fail
+                    // Fallback manual submit link
                     let fallbackUrl = conf.formAction.replace("formResponse", "viewform");
                     fallbackUrl += `?${conf.entryName}=${encodeURIComponent(currentStudentName)}&${conf.entryScore}=${score}&${conf.entryLevel}=${currentLevel}`;
                     if(conf.entryTime) fallbackUrl += `&${conf.entryTime}=${encodeURIComponent(finalTime)}`;
@@ -731,7 +724,7 @@
                     fallbackBtn.className = "block w-full bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 px-6 rounded-lg flex items-center justify-center gap-2";
                     fallbackBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Manual Submit (Backup)';
                     btnContainer.appendChild(fallbackBtn);
-                }
+                });
             }
 
             // 3. Email Button (Backup)
