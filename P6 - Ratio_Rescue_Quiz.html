@@ -12,7 +12,7 @@
         //  TEACHER CONFIGURATION AREA
         // ==========================================================================================
         
-        // Google Form Base Link (Corrected for POST submission)
+        // Google Form Base Link
         const FORM_ACTION_URL   = "https://docs.google.com/forms/d/e/1FAIpQLScSVH5G5QVKCtmbbtt08CHX9--ecu5ZfO2ZHAC03hGPR_FCPw/formResponse"; 
         
         // Entry IDs
@@ -27,10 +27,10 @@
         // ==========================================================================================
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        // Removed Firebase Auth entirely to prevent auth configuration errors
+        // FIX: Re-added Auth. Anonymous Auth is required for Firestore rules to allow read/writes.
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // Expose config to window
         window.teacherConfig = {
             formAction: FORM_ACTION_URL,
             entryName: ENTRY_ID_NAME,
@@ -44,29 +44,53 @@
 
         const initFirebase = async () => {
             try {
-                // Your ACTUAL Firebase Configuration
-                const firebaseConfig = {
-                  apiKey: "AIzaSyDwmyq_qNfTmFT2qHY9kSH-ygXQcwjjMwU",
-                  authDomain: "p6-ratio-rescue.firebaseapp.com",
-                  projectId: "p6-ratio-rescue",
-                  storageBucket: "p6-ratio-rescue.firebasestorage.app",
-                  messagingSenderId: "575502213103",
-                  appId: "1:575502213103:web:2e5ed6a7d9c9085e71e01a",
-                  measurementId: "G-J82VH6JB69"
-                };
+                // FIX: Use environment config if available, fallback to your specific config.
+                let firebaseConfig;
+                try {
+                    if (typeof __firebase_config !== 'undefined') {
+                        firebaseConfig = JSON.parse(__firebase_config);
+                    }
+                } catch(e) {}
+
+                if (!firebaseConfig) {
+                    firebaseConfig = {
+                        apiKey: "AIzaSyDwmyq_qNfTmFT2qHY9kSH-ygXQcwjjMwU",
+                        authDomain: "p6-ratio-rescue.firebaseapp.com",
+                        projectId: "p6-ratio-rescue",
+                        storageBucket: "p6-ratio-rescue.firebasestorage.app",
+                        messagingSenderId: "575502213103",
+                        appId: "1:575502213103:web:2e5ed6a7d9c9085e71e01a",
+                        measurementId: "G-J82VH6JB69"
+                    };
+                }
+
+                if (typeof __app_id !== 'undefined') {
+                    window.firebaseState.appId = __app_id;
+                }
 
                 const app = initializeApp(firebaseConfig);
                 const db = getFirestore(app);
+                const auth = getAuth(app);
                 
                 window.firebaseState.db = db;
+
+                // FIX: Authenticate using the environment's custom token first to obtain the correct Firestore permissions
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
                 
-                // Set to online immediately without checking authentication
-                window.firebaseState.isOnline = true; 
-                
-                // Allow UI to catch up and show the success message
-                setTimeout(() => {
-                    if(window.updateConnectionStatus) window.updateConnectionStatus(true);
-                }, 200);
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        window.firebaseState.user = user;
+                        window.firebaseState.isOnline = true; 
+                        
+                        setTimeout(() => {
+                            if(window.updateConnectionStatus) window.updateConnectionStatus(true);
+                        }, 200);
+                    }
+                });
                 
             } catch (e) {
                 console.error("Firebase Connection Error:", e);
@@ -78,16 +102,22 @@
         initFirebase();
 
         window.saveStudentResult = async (studentName, score, level, timeTaken, detailedLog) => {
-            if (!window.firebaseState.isOnline || !window.firebaseState.db) return false;
+            if (!window.firebaseState.isOnline || !window.firebaseState.db || !window.firebaseState.user) return false;
             try {
                 const colRef = collection(window.firebaseState.db, 'artifacts', window.firebaseState.appId, 'public', 'data', 'student_results');
                 
-                // 5-SECOND TIMEOUT SAFEGUARD: Prevents infinite spinning if blocked
                 const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000));
-                const savePromise = addDoc(colRef, { studentName, score, maxLevelReached: level, timeTaken: timeTaken, timestamp: serverTimestamp(), details: detailedLog });
+                const savePromise = addDoc(colRef, { 
+                    studentName, 
+                    score, 
+                    maxLevelReached: level, 
+                    timeTaken: timeTaken, 
+                    timestamp: serverTimestamp(), 
+                    details: detailedLog,
+                    userId: window.firebaseState.user.uid // Good practice to store who created it
+                });
                 
                 await Promise.race([savePromise, timeoutPromise]);
-                
                 return true;
             } catch (e) { 
                 console.error("Save Error:", e);
@@ -96,7 +126,10 @@
         };
         
         window.listenToResults = (callback) => {
-            if (!window.firebaseState.isOnline || !window.firebaseState.db) { callback([]); return; }
+            if (!window.firebaseState.isOnline || !window.firebaseState.db || !window.firebaseState.user) { 
+                callback([]); 
+                return; 
+            }
             const colRef = collection(window.firebaseState.db, 'artifacts', window.firebaseState.appId, 'public', 'data', 'student_results');
             const q = query(colRef);
             return onSnapshot(q, (snapshot) => {
@@ -106,6 +139,7 @@
                 callback(results);
             }, (error) => {
                 console.error("Leaderboard Error:", error);
+                callback([]); // FIX: Add error fallback
             });
         };
     </script>
@@ -186,7 +220,7 @@
             </div>
         </div>
         
-        <p class="text-xs text-gray-500" id="connection-status">Initializing...</p>
+        <p class="text-xs text-gray-500" id="connection-status">Initializing Database...</p>
     </div>
 
     <!-- Leaderboard Modal -->
@@ -673,12 +707,14 @@
                     // Get Stats
                     if (window.listenToResults) {
                         window.listenToResults((results) => {
-                            const stats = processLeaderboard(results);
-                            const myStat = stats.find(s => s.name.toLowerCase() === currentStudentName.toLowerCase());
-                            if(myStat) {
-                                document.getElementById('end-attempts').innerText = myStat.attempts;
-                                const rank = stats.indexOf(myStat) + 1;
-                                document.getElementById('end-rank').innerText = `#${rank}`;
+                            if (results && results.length > 0) {
+                                const stats = processLeaderboard(results);
+                                const myStat = stats.find(s => s.name.toLowerCase() === currentStudentName.toLowerCase());
+                                if(myStat) {
+                                    document.getElementById('end-attempts').innerText = myStat.attempts;
+                                    const rank = stats.indexOf(myStat) + 1;
+                                    document.getElementById('end-rank').innerText = `#${rank}`;
+                                }
                             }
                         });
                     }
@@ -691,27 +727,35 @@
                 saveMsg.innerHTML = '<span class="text-gray-500">Mode: Offline / Local File</span>';
             }
             
-            // 2. Auto-Submit Google Form (Silent Fetch)
+            // 2. Auto-Submit Google Form (Hidden IFrame method - avoids CORS)
             const conf = window.teacherConfig;
             if (conf.formAction && conf.entryName) {
-                const formData = new URLSearchParams();
-                formData.append(conf.entryName, currentStudentName);
-                formData.append(conf.entryScore, score);
-                formData.append(conf.entryLevel, currentLevel);
-                if (conf.entryTime) formData.append(conf.entryTime, finalTime);
-                
-                // Uses a direct HTTP push which is much more reliable than hidden iframes
-                fetch(conf.formAction, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: formData.toString()
-                }).then(() => {
+                try {
+                    const form = document.getElementById('google-form');
+                    form.action = conf.formAction;
+                    
+                    document.getElementById('form-name').name = conf.entryName;
+                    document.getElementById('form-name').value = currentStudentName;
+                    
+                    document.getElementById('form-score').name = conf.entryScore;
+                    document.getElementById('form-score').value = score;
+                    
+                    document.getElementById('form-level').name = conf.entryLevel;
+                    document.getElementById('form-level').value = currentLevel;
+                    
+                    if (conf.entryTime) {
+                        document.getElementById('form-time').name = conf.entryTime;
+                        document.getElementById('form-time').value = finalTime;
+                    }
+                    
+                    // Submit the form to the hidden iframe
+                    form.submit();
+                    
                     const autoMsg = document.createElement('div');
                     autoMsg.className = "text-green-400 text-xs mt-2";
-                    autoMsg.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Sent to Google Forms';
+                    autoMsg.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Sent to Teacher\'s Log!';
                     saveMsg.appendChild(autoMsg);
-                }).catch((e) => {
+                } catch(e) {
                     console.error("Auto-submit failed", e);
                     // Fallback manual submit link
                     let fallbackUrl = conf.formAction.replace("formResponse", "viewform");
@@ -724,7 +768,7 @@
                     fallbackBtn.className = "block w-full bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 px-6 rounded-lg flex items-center justify-center gap-2";
                     fallbackBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Manual Submit (Backup)';
                     btnContainer.appendChild(fallbackBtn);
-                });
+                }
             }
 
             // 3. Email Button (Backup)
@@ -860,7 +904,7 @@
             IMPORTANT: Do not use LaTeX formatting (like $30\text{cm}$). Use plain text (e.g. "30 cm") for units. Do not use Markdown (no **bold** or # headings), use HTML tags <b>, <strong>, <ul>, <li> instead.`;
 
             const result = await callGemini(prompt);
-            content.innerHTML = result || "<p class='text-red-400'>Analysis failed. Please try again.</p>";
+            content.innerHTML = result || "<p class='text-red-400'>Analysis failed to generate. Please try again.</p>";
         }
 
         function closeAnalysis() { document.getElementById('analysis-modal').classList.add('hidden'); }
@@ -871,14 +915,28 @@
             if(!key) return "<i>AI Config Error (No Key Provided)</i>";
 
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${key}`;
-            try {
-                const response = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] }) });
-                if (!response.ok) throw new Error(response.statusText);
-                const data = await response.json();
-                return data.candidates?.[0]?.content?.parts?.[0]?.text;
-            } catch (e) { 
-                console.error("Gemini Error:", e);
-                return null; 
+            
+            // Retry mechanism for API robustness
+            let attempts = 0;
+            while (attempts < 3) {
+                try {
+                    const response = await fetch(url, { 
+                        method: 'POST', 
+                        headers: { 'Content-Type': 'application/json' }, 
+                        body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] }) 
+                    });
+                    
+                    if (!response.ok) throw new Error(response.statusText);
+                    const data = await response.json();
+                    return data.candidates?.[0]?.content?.parts?.[0]?.text;
+                } catch (e) { 
+                    attempts++;
+                    if (attempts >= 3) {
+                        console.error("Gemini Error:", e);
+                        return null; 
+                    }
+                    await new Promise(r => setTimeout(r, 1000 * attempts)); // wait before retry
+                }
             }
         }
 
@@ -888,22 +946,30 @@
              const prompt = `Help a P6 student with this math question (Hint only, no answer): "${currentQuestion.text}". Options: ${currentQuestion.options.join(', ')}.`;
              const text = await callGemini(prompt);
              document.getElementById('sage-area').classList.remove('hidden');
-             document.getElementById('sage-text').innerText = text || "The Sage is silent (Connection Error)...";
+             document.getElementById('sage-text').innerText = text || "The Sage is taking a rest... please try again later.";
              btn.innerHTML = '<i class="fas fa-check"></i> Sage Spoken';
         }
 
         async function generateSimilarQuestion() {
             const loading = document.getElementById('loading-overlay'); loading.classList.remove('hidden');
-            const prompt = `Create a unique Singapore Primary 6 Math question about "${currentQuestion.category}". Similar difficulty/logic to: "${currentQuestion.text}". Return valid JSON: { "text": "...", "options": ["..."], "correctIndex": 0, "explanation": "..." }`;
+            const prompt = `Create a unique Singapore Primary 6 Math question about "${currentQuestion.category}". Similar difficulty/logic to: "${currentQuestion.text}". Return ONLY valid JSON: { "text": "...", "options": ["..."], "correctIndex": 0, "explanation": "..." }`;
             const result = await callGemini(prompt);
             loading.classList.add('hidden');
+            
             if (result) {
                 try {
-                    const newQ = JSON.parse(result.match(/\{[\s\S]*\}/)[0]);
+                    // FIX: Strip out markdown formatting if the AI includes it (e.g., ```json\n...\n```) before parsing
+                    const cleanResult = result.replace(/```json\n?|```/g, '').trim();
+                    const newQ = JSON.parse(cleanResult);
                     newQ.level = currentLevel; newQ.category = `${currentQuestion.category} (AI)`;
                     currentQuestion = newQ; renderQuestion(newQ);
-                } catch (e) { alert("Sage Error."); }
-            } else { alert("Connection Error."); }
+                } catch (e) { 
+                    console.error("JSON Parsing error:", e, result);
+                    alert("The AI generated a question, but the formatting was off. Please try again."); 
+                }
+            } else { 
+                alert("Connection Error. Please check your internet or API key."); 
+            }
         }
 
         // FX
