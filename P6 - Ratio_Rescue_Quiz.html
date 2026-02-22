@@ -19,6 +19,7 @@
         const ENTRY_ID_NAME     = "entry.1376623119"; 
         const ENTRY_ID_SCORE    = "entry.2032202022"; 
         const ENTRY_ID_LEVEL    = "entry.1918358329"; 
+        const ENTRY_ID_TIME     = "entry.41600829"; 
 
         // Teacher Email
         const TEACHER_EMAIL     = "newtonlabtuition@gmail.com"; 
@@ -35,6 +36,7 @@
             entryName: ENTRY_ID_NAME,
             entryScore: ENTRY_ID_SCORE,
             entryLevel: ENTRY_ID_LEVEL,
+            entryTime: ENTRY_ID_TIME,
             email: TEACHER_EMAIL
         };
 
@@ -77,11 +79,11 @@
         };
         initFirebase();
 
-        window.saveStudentResult = async (studentName, score, level, detailedLog) => {
+        window.saveStudentResult = async (studentName, score, level, timeTaken, detailedLog) => {
             if (!window.firebaseState.isOnline || !window.firebaseState.db) return false;
             try {
                 const colRef = collection(window.firebaseState.db, 'artifacts', window.firebaseState.appId, 'public', 'data', 'student_results');
-                await addDoc(colRef, { studentName, score, maxLevelReached: level, timestamp: serverTimestamp(), details: detailedLog });
+                await addDoc(colRef, { studentName, score, maxLevelReached: level, timeTaken: timeTaken, timestamp: serverTimestamp(), details: detailedLog });
                 return true;
             } catch (e) { 
                 console.error("Save Error:", e);
@@ -147,6 +149,7 @@
         <input type="text" name="" id="form-name">
         <input type="text" name="" id="form-score">
         <input type="text" name="" id="form-level">
+        <input type="text" name="" id="form-time">
     </form>
 
     <!-- Main Menu Screen -->
@@ -311,13 +314,12 @@
                     <span class="text-xs text-gray-400 block">SCORE</span>
                     <span id="score-display" class="font-bold text-green-400">0</span>
                 </div>
-            </div>
-            
-            <div class="flex items-center gap-3">
-                <div class="bg-gray-800 p-2 px-3 rounded-lg border border-gray-600 flex items-center">
-                    <i class="fas fa-clock text-blue-400 mr-2"></i>
-                    <span id="timer-display" class="font-mono font-bold text-white">00:00</span>
+                <div class="bg-gray-800 p-2 rounded-lg border border-gray-600 min-w-[80px] text-center">
+                    <span class="text-xs text-gray-400 block">TIME</span>
+                    <span id="timer-display" class="font-bold text-blue-400 font-mono">00:00</span>
                 </div>
+            </div>
+            <div class="flex items-center">
                 <div class="flex space-x-1" id="hearts-container"></div>
             </div>
         </div>
@@ -446,7 +448,7 @@
         let availableQuestions = [];
         let currentQuestion = null;
         let detailedLog = [];
-        let secondChanceActive = false;
+        let secondChanceActive = false; // For "Second Chance" mechanic
         
         // Timer Variables
         let startTime = null;
@@ -632,6 +634,8 @@
 
         async function endGame(victory) {
             clearInterval(timerInterval);
+            const finalTime = document.getElementById('timer-display').innerText;
+
             document.getElementById('game-screen').classList.add('hidden');
             document.getElementById('end-modal').classList.remove('hidden');
             
@@ -646,10 +650,10 @@
             
             let saveSuccess = false;
             
-            // 1. Firebase Save (Now explicitly using provided keys)
+            // 1. Firebase Save
             if (window.saveStudentResult && window.firebaseState.isOnline) {
                 saveMsg.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
-                const success = await window.saveStudentResult(currentStudentName, score, currentLevel, detailedLog);
+                const success = await window.saveStudentResult(currentStudentName, score, currentLevel, finalTime, detailedLog);
                 if (success) {
                     saveMsg.innerHTML = '<i class="fas fa-check-circle text-green-500"></i> Saved to Class DB';
                     saveSuccess = true;
@@ -687,6 +691,11 @@
                     
                     document.getElementById('form-level').name = conf.entryLevel;
                     document.getElementById('form-level').value = currentLevel;
+
+                    if (conf.entryTime) {
+                        document.getElementById('form-time').name = conf.entryTime;
+                        document.getElementById('form-time').value = finalTime;
+                    }
                     
                     document.getElementById('google-form').action = conf.formAction;
                     
@@ -695,14 +704,18 @@
                     
                     const autoMsg = document.createElement('div');
                     autoMsg.className = "text-green-400 text-xs mt-2";
-                    autoMsg.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Sent to Teacher';
+                    autoMsg.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Sent to Google Forms';
                     saveMsg.appendChild(autoMsg);
                     
                 } catch(e) {
                     console.error("Auto-submit failed", e);
                     // Fallback button if auto-fail
+                    let fallbackUrl = conf.formAction.replace("formResponse", "viewform");
+                    fallbackUrl += `?${conf.entryName}=${encodeURIComponent(currentStudentName)}&${conf.entryScore}=${score}&${conf.entryLevel}=${currentLevel}`;
+                    if(conf.entryTime) fallbackUrl += `&${conf.entryTime}=${encodeURIComponent(finalTime)}`;
+
                     const fallbackBtn = document.createElement('a');
-                    fallbackBtn.href = conf.formAction.replace("formResponse", "viewform");
+                    fallbackBtn.href = fallbackUrl;
                     fallbackBtn.target = "_blank";
                     fallbackBtn.className = "block w-full bg-yellow-600 hover:bg-yellow-500 text-white font-bold py-3 px-6 rounded-lg flex items-center justify-center gap-2";
                     fallbackBtn.innerHTML = '<i class="fas fa-exclamation-triangle"></i> Manual Submit (Backup)';
@@ -713,7 +726,7 @@
             // 3. Email Button (Backup)
             if (conf.email && conf.email.length > 3) {
                 const subject = `Ratio Rescue Result: ${currentStudentName}`;
-                const body = `Student: ${currentStudentName}%0D%0AScore: ${score}%0D%0AMax Level: ${currentLevel}%0D%0A%0D%0A(Generated by Ratio Rescue)`;
+                const body = `Student: ${currentStudentName}%0D%0AScore: ${score}%0D%0AMax Level: ${currentLevel}%0D%0ATime Taken: ${finalTime}%0D%0A%0D%0A(Generated by Ratio Rescue)`;
                 const mailto = `mailto:${conf.email}?subject=${encodeURIComponent(subject)}&body=${body}`;
                 const emailBtn = document.createElement('a');
                 emailBtn.href = mailto;
