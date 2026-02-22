@@ -27,7 +27,7 @@
         // ==========================================================================================
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        // Removed Firebase Auth entirely since the DB is in Test Mode
         import { getFirestore, collection, addDoc, query, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Expose config to window
@@ -56,25 +56,21 @@
                 };
 
                 const app = initializeApp(firebaseConfig);
-                const auth = getAuth(app);
                 const db = getFirestore(app);
                 
                 window.firebaseState.db = db;
-
-                onAuthStateChanged(auth, (user) => {
-                    if (user) {
-                        window.firebaseState.user = user;
-                        window.firebaseState.isOnline = true;
-                        window.updateConnectionStatus(true);
-                    }
-                });
+                window.firebaseState.isOnline = true; // Set online instantly!
                 
-                // Anonymously sign in the student's browser so they can write to the database
-                await signInAnonymously(auth);
+                // Allow UI to catch up and show the success message
+                setTimeout(() => {
+                    if(window.updateConnectionStatus) window.updateConnectionStatus(true);
+                }, 200);
                 
             } catch (e) {
-                console.log("⚠️ Offline Mode (Could not connect to Firebase):", e.message);
-                window.updateConnectionStatus(false);
+                console.error("Firebase Connection Error:", e);
+                setTimeout(() => {
+                    if(window.updateConnectionStatus) window.updateConnectionStatus(false);
+                }, 200);
             }
         };
         initFirebase();
@@ -650,7 +646,7 @@
             
             let saveSuccess = false;
             
-            // 1. Firebase Save
+            // 1. Firebase Save (Now explicitly using provided keys and adding finalTime)
             if (window.saveStudentResult && window.firebaseState.isOnline) {
                 saveMsg.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
                 const success = await window.saveStudentResult(currentStudentName, score, currentLevel, finalTime, detailedLog);
