@@ -27,7 +27,7 @@
         // ==========================================================================================
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        // Removed Firebase Auth entirely since the DB is in Test Mode
+        // Removed Firebase Auth entirely to prevent auth configuration errors
         import { getFirestore, collection, addDoc, query, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // Expose config to window
@@ -59,7 +59,9 @@
                 const db = getFirestore(app);
                 
                 window.firebaseState.db = db;
-                window.firebaseState.isOnline = true; // Set online instantly!
+                
+                // Set to online immediately without checking authentication
+                window.firebaseState.isOnline = true; 
                 
                 // Allow UI to catch up and show the success message
                 setTimeout(() => {
@@ -79,7 +81,13 @@
             if (!window.firebaseState.isOnline || !window.firebaseState.db) return false;
             try {
                 const colRef = collection(window.firebaseState.db, 'artifacts', window.firebaseState.appId, 'public', 'data', 'student_results');
-                await addDoc(colRef, { studentName, score, maxLevelReached: level, timeTaken: timeTaken, timestamp: serverTimestamp(), details: detailedLog });
+                
+                // 5-SECOND TIMEOUT SAFEGUARD: Prevents infinite spinning if blocked
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000));
+                const savePromise = addDoc(colRef, { studentName, score, maxLevelReached: level, timeTaken: timeTaken, timestamp: serverTimestamp(), details: detailedLog });
+                
+                await Promise.race([savePromise, timeoutPromise]);
+                
                 return true;
             } catch (e) { 
                 console.error("Save Error:", e);
@@ -96,6 +104,8 @@
                 snapshot.forEach(doc => results.push({ id: doc.id, ...doc.data() }));
                 results.sort((a, b) => (b.timestamp?.seconds || 0) - (a.timestamp?.seconds || 0));
                 callback(results);
+            }, (error) => {
+                console.error("Leaderboard Error:", error);
             });
         };
     </script>
@@ -630,7 +640,12 @@
 
         async function endGame(victory) {
             clearInterval(timerInterval);
-            const finalTime = document.getElementById('timer-display').innerText;
+            
+            // Mathematically calculate the final time directly from the timestamps (bulletproof method)
+            const finalDiff = Math.floor((Date.now() - startTime) / 1000);
+            const finalM = Math.floor(finalDiff / 60).toString().padStart(2, '0');
+            const finalS = (finalDiff % 60).toString().padStart(2, '0');
+            const finalTime = `${finalM}:${finalS}`;
 
             document.getElementById('game-screen').classList.add('hidden');
             document.getElementById('end-modal').classList.remove('hidden');
