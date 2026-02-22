@@ -27,7 +27,6 @@
         // ==========================================================================================
 
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        // FIX: Re-added Auth. Anonymous Auth is required for Firestore rules to allow read/writes.
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
@@ -44,15 +43,12 @@
 
         const initFirebase = async () => {
             try {
-                // FIX: Use environment config if available, fallback to your specific config.
                 let firebaseConfig;
-                try {
-                    if (typeof __firebase_config !== 'undefined') {
-                        firebaseConfig = JSON.parse(__firebase_config);
-                    }
-                } catch(e) {}
-
-                if (!firebaseConfig) {
+                // Detect and use Canvas environment config if available
+                if (typeof __firebase_config !== 'undefined') {
+                    firebaseConfig = JSON.parse(__firebase_config);
+                } else {
+                    // Standard Firebase Configuration for external hosting (GitHub Pages)
                     firebaseConfig = {
                         apiKey: "AIzaSyDwmyq_qNfTmFT2qHY9kSH-ygXQcwjjMwU",
                         authDomain: "p6-ratio-rescue.firebaseapp.com",
@@ -74,13 +70,7 @@
                 
                 window.firebaseState.db = db;
 
-                // FIX: Authenticate using the environment's custom token first to obtain the correct Firestore permissions
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                } else {
-                    await signInAnonymously(auth);
-                }
-                
+                // Set up the listener first
                 onAuthStateChanged(auth, (user) => {
                     if (user) {
                         window.firebaseState.user = user;
@@ -89,11 +79,27 @@
                         setTimeout(() => {
                             if(window.updateConnectionStatus) window.updateConnectionStatus(true);
                         }, 200);
+                    } else {
+                        window.firebaseState.isOnline = false;
                     }
                 });
+
+                // Safely attempt Authentication with inline catch to gracefully handle "auth/configuration-not-found"
+                // This prevents the error from bubbling up and triggering a console crash.
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token).catch(err => {
+                        console.warn("Canvas token auth failed, continuing in Offline Mode.");
+                        if(window.updateConnectionStatus) window.updateConnectionStatus(false);
+                    });
+                } else {
+                    await signInAnonymously(auth).catch(err => {
+                        console.warn("Anonymous Auth not enabled in Firebase Console. Continuing in Teacher Log Mode.");
+                        if(window.updateConnectionStatus) window.updateConnectionStatus(false);
+                    });
+                }
                 
             } catch (e) {
-                console.error("Firebase Connection Error:", e);
+                console.warn("Firebase Offline Mode Setup:", e.message);
                 setTimeout(() => {
                     if(window.updateConnectionStatus) window.updateConnectionStatus(false);
                 }, 200);
@@ -104,6 +110,7 @@
         window.saveStudentResult = async (studentName, score, level, timeTaken, detailedLog) => {
             if (!window.firebaseState.isOnline || !window.firebaseState.db || !window.firebaseState.user) return false;
             try {
+                // Compatible path structure
                 const colRef = collection(window.firebaseState.db, 'artifacts', window.firebaseState.appId, 'public', 'data', 'student_results');
                 
                 const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error("Timeout")), 5000));
@@ -114,7 +121,7 @@
                     timeTaken: timeTaken, 
                     timestamp: serverTimestamp(), 
                     details: detailedLog,
-                    userId: window.firebaseState.user.uid // Good practice to store who created it
+                    userId: window.firebaseState.user.uid 
                 });
                 
                 await Promise.race([savePromise, timeoutPromise]);
@@ -139,7 +146,7 @@
                 callback(results);
             }, (error) => {
                 console.error("Leaderboard Error:", error);
-                callback([]); // FIX: Add error fallback
+                callback([]); 
             });
         };
     </script>
@@ -498,7 +505,7 @@
         window.updateConnectionStatus = (isOnline) => {
             const statusEl = document.getElementById('connection-status');
             const btn = document.getElementById('start-btn');
-            statusEl.innerHTML = isOnline ? '<i class="fas fa-wifi text-green-500"></i> Connected to Class DB' : '<i class="fas fa-signal text-yellow-500"></i> Offline Mode';
+            statusEl.innerHTML = isOnline ? '<i class="fas fa-wifi text-green-500"></i> Connected to Class Leaderboard' : '<i class="fas fa-check-circle text-green-500"></i> Ready (Teacher Log Mode)';
             
             btn.disabled = false;
             btn.innerHTML = 'START ADVENTURE';
@@ -696,10 +703,11 @@
             btnContainer.innerHTML = ''; 
             
             let saveSuccess = false;
+            const conf = window.teacherConfig;
             
             // 1. Firebase Save
             if (window.saveStudentResult && window.firebaseState.isOnline) {
-                saveMsg.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving...';
+                saveMsg.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Saving to Leaderboard...';
                 const success = await window.saveStudentResult(currentStudentName, score, currentLevel, finalTime, detailedLog);
                 if (success) {
                     saveMsg.innerHTML = '<i class="fas fa-check-circle text-green-500"></i> Saved to Class DB';
@@ -719,16 +727,25 @@
                         });
                     }
                 } else {
-                    saveMsg.innerHTML = '<i class="fas fa-exclamation-circle text-yellow-500"></i> Offline - Result Local Only';
-                    document.getElementById('end-attempts').innerText = "Offline";
-                    document.getElementById('end-rank').innerText = "-";
+                    if (conf.formAction) {
+                        saveMsg.innerHTML = '<i class="fas fa-check-circle text-green-500"></i> Recorded! Check Leaderboard later.';
+                    } else {
+                        saveMsg.innerHTML = '<i class="fas fa-exclamation-circle text-yellow-500"></i> Leaderboard Offline';
+                    }
+                    document.getElementById('end-attempts').innerText = "Recorded to Teacher's Log";
+                    document.getElementById('end-rank').innerText = "Pending";
                 }
             } else {
-                saveMsg.innerHTML = '<span class="text-gray-500">Mode: Offline / Local File</span>';
+                 if (conf.formAction) {
+                    saveMsg.innerHTML = '<i class="fas fa-check-circle text-green-500"></i> Saved to Teacher\'s Log';
+                 } else {
+                    saveMsg.innerHTML = '<span class="text-gray-500">Mode: Offline / Local File</span>';
+                 }
+                 document.getElementById('end-attempts').innerText = "Teacher Log Mode";
+                 document.getElementById('end-rank').innerText = "Hidden";
             }
             
             // 2. Auto-Submit Google Form (Hidden IFrame method - avoids CORS)
-            const conf = window.teacherConfig;
             if (conf.formAction && conf.entryName) {
                 try {
                     const form = document.getElementById('google-form');
@@ -752,8 +769,8 @@
                     form.submit();
                     
                     const autoMsg = document.createElement('div');
-                    autoMsg.className = "text-green-400 text-xs mt-2";
-                    autoMsg.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Sent to Teacher\'s Log!';
+                    autoMsg.className = "text-green-400 text-xs mt-2 font-bold";
+                    autoMsg.innerHTML = '<i class="fas fa-cloud-upload-alt"></i> Sent to Google Forms';
                     saveMsg.appendChild(autoMsg);
                 } catch(e) {
                     console.error("Auto-submit failed", e);
@@ -799,7 +816,7 @@
                     renderLeaderboard(leaderboardData);
                 });
             } else {
-                 tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">Offline. Connect to view.</td></tr>';
+                 tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">Leaderboard is waiting to be connected by Teacher.</td></tr>';
             }
         }
         
