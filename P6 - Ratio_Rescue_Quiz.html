@@ -961,7 +961,8 @@
         function closeAnalysis() { document.getElementById('analysis-modal').classList.add('hidden'); }
 
         async function callGemini(promptText) {
-            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+            // Updated model name for public API keys (gemini-1.5-flash)
+            const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
             
             // Exponential backoff retry mechanism (up to 5 times)
             const delays = [1000, 2000, 4000, 8000, 16000];
