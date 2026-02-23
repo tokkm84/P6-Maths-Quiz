@@ -48,7 +48,7 @@
                 if (typeof __firebase_config !== 'undefined') {
                     firebaseConfig = JSON.parse(__firebase_config);
                 } else {
-                    // Standard Firebase Configuration for external hosting (GitHub Pages)
+                    // IMPORTANT: Ensure these match YOUR Firebase project settings from the console
                     firebaseConfig = {
                         apiKey: "AIzaSyDwmyq_qNfTmFT2qHY9kSH-ygXQcwjjMwU",
                         authDomain: "p6-ratio-rescue.firebaseapp.com",
@@ -84,8 +84,7 @@
                     }
                 });
 
-                // Safely attempt Authentication with inline catch to gracefully handle "auth/configuration-not-found"
-                // This prevents the error from bubbling up and triggering a console crash.
+                // Safely attempt Authentication
                 if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                     await signInWithCustomToken(auth, __initial_auth_token).catch(err => {
                         console.warn("Canvas token auth failed, continuing in Offline Mode.");
@@ -93,15 +92,26 @@
                     });
                 } else {
                     await signInAnonymously(auth).catch(err => {
-                        console.warn("Anonymous Auth not enabled in Firebase Console. Continuing in Teacher Log Mode.");
-                        if(window.updateConnectionStatus) window.updateConnectionStatus(false);
+                        console.warn("Anonymous Auth Error:", err);
+                        
+                        // Smart error reporting for GitHub deployment
+                        let helperMsg = "Check Firebase settings.";
+                        if (err.code === 'auth/unauthorized-domain') {
+                            helperMsg = "Add GitHub domain to Auth > Settings > Authorized Domains.";
+                        } else if (err.code === 'auth/operation-not-allowed' || err.code === 'auth/admin-restricted-operation') {
+                            helperMsg = "Enable 'Anonymous' under Auth > Sign-in method.";
+                        } else if (err.code === 'auth/invalid-api-key') {
+                            helperMsg = "Invalid Firebase API Key in code.";
+                        }
+                        
+                        if(window.updateConnectionStatus) window.updateConnectionStatus(false, helperMsg);
                     });
                 }
                 
             } catch (e) {
                 console.warn("Firebase Offline Mode Setup:", e.message);
                 setTimeout(() => {
-                    if(window.updateConnectionStatus) window.updateConnectionStatus(false);
+                    if(window.updateConnectionStatus) window.updateConnectionStatus(false, "Failed to initialize app.");
                 }, 200);
             }
         };
@@ -155,6 +165,15 @@
                 callback(results);
             }, (error) => {
                 console.error("Leaderboard Error:", error);
+                
+                // Show a helpful visual alert if the rules are missing on GitHub
+                if (error.code === 'permission-denied') {
+                    const tbody = document.getElementById('leaderboard-body');
+                    if (tbody) tbody.innerHTML = `<tr><td colspan="4" class="text-center py-4 text-red-400 text-xs"><b>Firestore Rules Blocked.</b><br>Update Firestore Rules to allow read/write.</td></tr>`;
+                    
+                    const tbResults = document.getElementById('results-table-body');
+                    if (tbResults) tbResults.innerHTML = `<tr><td colspan="5" class="text-center py-4 text-red-400 text-xs"><b>Firestore Rules Blocked.</b><br>Update Firestore Rules to allow read/write.</td></tr>`;
+                }
                 callback([]); 
             });
         };
@@ -511,10 +530,16 @@
         let timerInterval = null;
 
         // UI Helpers
-        window.updateConnectionStatus = (isOnline) => {
+        window.updateConnectionStatus = (isOnline, errMsg = null) => {
             const statusEl = document.getElementById('connection-status');
             const btn = document.getElementById('start-btn');
-            statusEl.innerHTML = isOnline ? '<i class="fas fa-wifi text-green-500"></i> Connected to Class Leaderboard' : '<i class="fas fa-check-circle text-green-500"></i> Ready (Teacher Log Mode)';
+            
+            if (isOnline) {
+                statusEl.innerHTML = '<i class="fas fa-wifi text-green-500"></i> Connected to Class Leaderboard';
+            } else {
+                statusEl.innerHTML = `<i class="fas fa-check-circle text-green-500"></i> Ready (Teacher Log Mode)` + 
+                                     (errMsg ? `<br><span class="text-red-400 text-[10px] mt-1 inline-block"><i class="fas fa-exclamation-triangle"></i> Leaderboard Offline: ${errMsg}</span>` : '');
+            }
             
             btn.disabled = false;
             btn.innerHTML = 'START ADVENTURE';
@@ -524,7 +549,7 @@
 
         setTimeout(() => {
             const btn = document.getElementById('start-btn');
-            if (btn.disabled) window.updateConnectionStatus(false);
+            if (btn.disabled) window.updateConnectionStatus(false, "Timeout connecting to DB.");
         }, 3000);
 
         function checkNameAndStart() {
@@ -825,7 +850,7 @@
                     renderLeaderboard(leaderboardData);
                 });
             } else {
-                 tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">Leaderboard is waiting to be connected by Teacher.</td></tr>';
+                 tbody.innerHTML = '<tr><td colspan="4" class="text-center py-4 text-gray-500">Leaderboard is offline (Check Firebase settings).</td></tr>';
             }
         }
         
