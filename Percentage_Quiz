@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PSLE Math Mastery: Percentages</title>
+    <!-- Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React and ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+    <!-- Babel to compile React JSX in the browser -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useMemo } = React;
+
+        // ==========================================
+        // TEACHER CONFIGURATION SETTINGS
+        // ==========================================
+        const TEACHER_WHATSAPP_NUMBER = "6588061249"; 
+        
+        // Your Google Form Configuration (Verified!)
+        const GOOGLE_FORM_BASE_URL = "https://docs.google.com/forms/d/e/1FAIpQLSd0BU0wo9v5lhLp9tpqII5yCiJvbH_GVogQGAqPfMGsrRP73Q/viewform";
+        const GOOGLE_FORM_NAME_ENTRY = "entry.1376623119"; 
+        const GOOGLE_FORM_SCORE_ENTRY = "entry.2032202022"; 
+        const GOOGLE_FORM_TIME_ENTRY = "entry.41600829"; 
+
+        // Mascot Settings
+        const MASCOT_IMAGE_URL = "https://s3.amazonaws.com/comicgeeks/characters/avatars/107464.jpg";
+
+        // Gemini API Key for AI Hints
+        const apiKey = "AIzaSyBINxXF3CjHt31wGPitCrBkxkXECsiWqtE"; 
+        // ==========================================
+
+        // --- Inline SVG Icons ---
+        const Icon = ({ name, className = "", size = 24 }) => {
+            const svgAttrs = {
+                xmlns: "http://www.w3.org/2000/svg",
+                width: size, height: size,
+                viewBox: "0 0 24 24",
+                fill: "none", stroke: "currentColor",
+                strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round",
+                className: className
+            };
+            switch(name) {
+                case 'award': return <svg {...svgAttrs}><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>;
+                case 'calculator': return <svg {...svgAttrs}><rect x="4" y="2" width="16" height="20" rx="2" ry="2"></rect><line x1="8" y1="6" x2="16" y2="6"></line><line x1="16" y1="14" x2="16" y2="18"></line><path d="M16 10h.01"></path><path d="M12 10h.01"></path><path d="M8 10h.01"></path><path d="M12 14h.01"></path><path d="M8 14h.01"></path><path d="M12 18h.01"></path><path d="M8 18h.01"></path></svg>;
+                case 'sparkles': return <svg {...svgAttrs}><path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"></path><path d="M5 3v4"></path><path d="M19 17v4"></path><path d="M3 5h4"></path><path d="M17 19h4"></path></svg>;
+                case 'chevron-left': return <svg {...svgAttrs}><polyline points="15 18 9 12 15 6"></polyline></svg>;
+                case 'chevron-right': return <svg {...svgAttrs}><polyline points="9 18 15 12 9 6"></polyline></svg>;
+                case 'clock': return <svg {...svgAttrs}><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>;
+                case 'help-circle': return <svg {...svgAttrs}><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>;
+                case 'x-circle': return <svg {...svgAttrs}><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>;
+                case 'check-circle': return <svg {...svgAttrs}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>;
+                case 'loader': return <svg {...svgAttrs} className={`animate-spin ${className}`}><line x1="12" y1="2" x2="12" y2="6"></line><line x1="12" y1="18" x2="12" y2="22"></line><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"></line><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"></line><line x1="2" y1="12" x2="6" y2="12"></line><line x1="18" y1="12" x2="22" y2="12"></line><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"></line><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"></line></svg>;
+                case 'send': return <svg {...svgAttrs}><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>;
+                default: return null;
+            }
+        };
+
+        const sourceQuizData = [
+            {
+                questionNumber: 1, question: "Express 3/5 as a percentage.", level: 1, marks: 1, calculator: false,
+                options: [
+                    { text: "35%", rationale: "This incorrectly combines the digits 3 and 5. To convert a fraction to a percentage, multiply it by 100%.", isCorrect: false },
+                    { text: "60%", rationale: "To convert a fraction to a percentage, multiply it by 100%. (3/5) × 100% = 60%.", isCorrect: true },
+                    { text: "30%", rationale: "This calculation is incorrect. Multiply the numerator by 100 and divide by the denominator.", isCorrect: false },
+                    { text: "15%", rationale: "This is the result of multiplying 3 and 5, which is not how you convert fractions to percentages.", isCorrect: false }
+                ],
+                hint: "To convert a fraction to a percentage, multiply the fraction by 100%."
+            },
+            {
+                questionNumber: 2, question: "Express 0.45 as a percentage.", level: 1, marks: 1, calculator: false,
+                options: [
+                    { text: "4.5%", rationale: "This happens when the decimal is only multiplied by 10. You need to multiply by 100.", isCorrect: false },
+                    { text: "450%", rationale: "This happens when the decimal is multiplied by 1000. You need to multiply by 100.", isCorrect: false },
+                    { text: "45%", rationale: "To convert a decimal to a percentage, multiply it by 100%. 0.45 × 100% = 45%.", isCorrect: true },
+                    { text: "0.45%", rationale: "You must move the decimal point two places to the right to convert to a percentage.", isCorrect: false }
+                ],
+                hint: "To convert a decimal to a percentage, multiply the decimal by 100% (move the decimal point two places to the right)."
+            },
+            {
+                questionNumber: 3, question: "Express 40% as a fraction in its simplest form.", level: 1, marks: 1, calculator: false,
+                options: [
+                    { text: "40/100", rationale: "While technically equivalent, this fraction is not in its simplest form. Both numbers can be divided by 20.", isCorrect: false },
+                    { text: "1/4", rationale: "This is 25%, not 40%. Make sure to put 40 over 100 and simplify.", isCorrect: false },
+                    { text: "2/5", rationale: "40% means 40 out of 100. 40/100 simplifies to 2/5 when dividing the top and bottom by 20.", isCorrect: true },
+                    { text: "4/5", rationale: "This is 80%. You may have simplified incorrectly.", isCorrect: false }
+                ],
+                hint: "Write the percentage as a fraction over 100, then divide the numerator and denominator by their greatest common factor."
+            },
+            {
+                questionNumber: 4, question: "What is 20% of 150?", level: 1, marks: 1, calculator: false,
+                options: [
+                    { text: "20", rationale: "This is just the percentage number, not the calculated value of the part.", isCorrect: false },
+                    { text: "30", rationale: "20% is equivalent to the fraction 1/5. 1/5 of 150 is 30.", isCorrect: true },
+                    { text: "15", rationale: "This is 10% of 150, not 20%.", isCorrect: false },
+                    { text: "50", rationale: "This is a calculation error. Remember that 20% is 20/100.", isCorrect: false }
+                ],
+                hint: "Convert 20% to a fraction (like 20/100 or 1/5) and multiply it by 150."
+            },
+            {
+                questionNumber: 5, question: "In a class of 40 students, 8 students wear glasses. What percentage of the students wear glasses?", level: 1, marks: 1, calculator: false,
+                options: [
+                    { text: "8%", rationale: "This is the raw number of students, not the percentage out of 100.", isCorrect: false },
+                    { text: "32%", rationale: "This is the number of students who do NOT wear glasses (40 - 8 = 32).", isCorrect: false },
+                    { text: "20%", rationale: "The fraction of students wearing glasses is 8/40, which simplifies to 1/5. 1/5 × 100% = 20%.", isCorrect: true },
+                    { text: "25%", rationale: "This is 1/4. You may have miscalculated 8/40.", isCorrect: false }
+                ],
+                hint: "Write the part over the whole (8/40) and multiply by 100%."
+            },
+            {
+                questionNumber: 6, question: "30% of a number is 60. What is the number?", level: 1, marks: 1, calculator: false,
+                options: [
+                    { text: "18", rationale: "This is 30% OF 60. The question says 30% IS 60, meaning you need to find the whole (100%).", isCorrect: false },
+                    { text: "180", rationale: "This is a calculation error. Find 1% first by dividing 60 by 30.", isCorrect: false },
+                    { text: "200", rationale: "If 30% -> 60, then 1% -> 2. Therefore, 100% -> 2 × 100 = 200.", isCorrect: true },
+                    { text: "20", rationale: "This is 60 divided by 3, but you need to account for the percentage. 60 divided by 0.3 is 200.", isCorrect: false }
+                ],
+                hint: "Use the unitary method. If 30% is 60, what is 1%? Once you have 1%, multiply by 100 to find the whole number."
+            },
+            {
+                questionNumber: 7, question: "Express 8% as a decimal.", level: 1, marks: 1, calculator: false,
+                options: [
+                    { text: "0.8", rationale: "This is 80%. To convert to a decimal, you must divide by 100 (move the decimal two places left).", isCorrect: false },
+                    { text: "0.08", rationale: "8% means 8/100. As a decimal, this is 0.08.", isCorrect: true },
+                    { text: "8.0", rationale: "This is 800%. Remember that 100% is equal to 1.0.", isCorrect: false },
+                    { text: "0.008", rationale: "This is 0.8%. You moved the decimal point three places instead of two.", isCorrect: false }
+                ],
+                hint: "To convert a percentage to a decimal, divide the number by 100."
+            },
+            {
+                questionNumber: 8, question: "Find the value of 75% of 80.", level: 1, marks: 1, calculator: false,
+                options: [
+                    { text: "20", rationale: "This is 25% of 80, not 75%.", isCorrect: false },
+                    { text: "60", rationale: "75% is equivalent to 3/4. 3/4 × 80 = 60.", isCorrect: true },
+                    { text: "75", rationale: "This is just the percentage number. You need to calculate a fraction of 80.", isCorrect: false },
+                    { text: "40", rationale: "This is 50% of 80. 75% will be higher than half.", isCorrect: false }
+                ],
+                hint: "It helps to remember common fractions! 75% is the same as 3/4."
+            },
+            {
+                questionNumber: 9, question: "Ali scored 45 out of 50 marks for a math test. What percentage did he score?", level: 1, marks: 1, calculator: false,
+                options: [
+                    { text: "45%", rationale: "This would be true if the test was out of 100. Because the test is out of 50, you must convert the fraction.", isCorrect: false },
+                    { text: "90%", rationale: "The fraction is 45/50. To make the denominator 100, multiply top and bottom by 2, which gives 90/100 = 90%.", isCorrect: true },
+                    { text: "80%", rationale: "This is equivalent to 40/50.", isCorrect: false },
+                    { text: "95%", rationale: "This is equivalent to 47.5/50.", isCorrect: false }
+                ],
+                hint: "Try to make the denominator 100. If you multiply 50 by 2, what must you do to the numerator?"
+            },
+            {
+                questionNumber: 10, question: "There are 20 red apples and 30 green apples in a basket. What percentage of the apples are red?", level: 1, marks: 1, calculator: false,
+                options: [
+                    { text: "20%", rationale: "This is the number of red apples, not the percentage out of the total.", isCorrect: false },
+                    { text: "30%", rationale: "This is the number of green apples.", isCorrect: false },
+                    { text: "40%", rationale: "The total number of apples is 20 + 30 = 50. The fraction of red apples is 20/50 = 40/100 = 40%.", isCorrect: true },
+                    { text: "60%", rationale: "This is the percentage of green apples, not red apples.", isCorrect: false }
+                ],
+                hint: "First, find the total number of apples in the basket to use as your 'whole' denominator."
+            },
+            {
+                questionNumber: 11, question: "A bag costs $60. After a discount, it costs $45. What is the percentage discount?", level: 2, marks: 2, calculator: false,
+                options: [
+                    { text: "15%", rationale: "This is the dollar amount of the discount ($60 - $45 = $15), not the percentage.", isCorrect: false },
+                    { text: "75%", rationale: "This is the percentage of the original price that was paid (45/60), not the discount percentage.", isCorrect: false },
+                    { text: "25%", rationale: "The discount amount is $15. The percentage discount is (15/60) × 100% = 25%.", isCorrect: true },
+                    { text: "33 1/3%", rationale: "This is calculating the discount over the final price (15/45). Percentage discount is always based on the original price.", isCorrect: false }
+                ],
+                hint: "Find the difference in price first. Percentage discount is the (Discount Amount ÷ Original Price) × 100%."
+            },
+            {
+                questionNumber: 12, question: "The price of a pair of shoes after a 20% discount is $80. What was the original price of the shoes?", level: 2, marks: 2, calculator: false,
+                options: [
+                    { text: "$96", rationale: "This is adding 20% of $80 to $80. The discount was based on the original price, not the final price.", isCorrect: false },
+                    { text: "$100", rationale: "If the discount is 20%, the customer pays 80%. So, 80% -> $80. Therefore, 100% -> $100.", isCorrect: true },
+                    { text: "$64", rationale: "This is subtracting another 20% from the final price.", isCorrect: false },
+                    { text: "$120", rationale: "This is incorrect. Remember that 80% of the original price is $80.", isCorrect: false }
+                ],
+                hint: "If there is a 20% discount, what percentage of the original price is $80?"
+            },
+            {
+                questionNumber: 13, question: "Mr Tan bought a television for $400. He also had to pay a 9% GST on the price of the television. How much did he pay in total?", level: 2, marks: 2, calculator: false,
+                options: [
+                    { text: "$409", rationale: "This just adds 9 to 400. You need to calculate 9% of $400.", isCorrect: false },
+                    { text: "$436", rationale: "GST is 9% of $400, which is 9/100 × 400 = $36. Total price = $400 + $36 = $436.", isCorrect: true },
+                    { text: "$364", rationale: "This is subtracting the GST from the price. GST is an additional tax added to the price.", isCorrect: false },
+                    { text: "$490", rationale: "This is an incorrect calculation. 9% is 9/100, not 90/100.", isCorrect: false }
+                ],
+                hint: "Find the GST amount first by calculating 9% of $400, then add it to the original price."
+            },
+            {
+                questionNumber: 14, question: "A shop sold 20 chairs in July. In August, the number of chairs sold increased by 80%. How many chairs were sold in August?", level: 2, marks: 2, calculator: false,
+                options: [
+                    { text: "16", rationale: "This is the increase in the number of chairs (80% of 20 = 16), not the total sold in August.", isCorrect: false },
+                    { text: "36", rationale: "The increase is 80% of 20, which is 16. The total sold in August is 20 + 16 = 36. (Or 20 × 1.8).", isCorrect: true },
+                    { text: "100", rationale: "This simply adds 80 to 20. The 80% is a percentage of the July sales.", isCorrect: false },
+                    { text: "80", rationale: "This is just the percentage number. You must calculate the actual number of chairs.", isCorrect: false }
+                ],
+                hint: "Calculate the increase (80% of 20) and add it to the amount sold in July."
+            },
+            {
+                questionNumber: 15, question: "After spending 60% of his money, Ryan had $120 left. How much money did he have at first?", level: 2, marks: 2, calculator: false,
+                options: [
+                    { text: "$200", rationale: "If he spent 60%, he had 40% left. This answer assumes 60% is $120.", isCorrect: false },
+                    { text: "$300", rationale: "If he spent 60%, he has 40% left. So, 40% -> $120. 1% -> $3. 100% -> $300.", isCorrect: true },
+                    { text: "$192", rationale: "This is an incorrect calculation based on confusing the percentages.", isCorrect: false },
+                    { text: "$72", rationale: "This is 60% of $120. You need to work backwards to find the original 100%.", isCorrect: false }
+                ],
+                hint: "If Ryan spent 60%, what percentage represents the $120 he has left? Use that to find 100%."
+            },
+            {
+                questionNumber: 16, question: "The price of a fan decreased from $80 to $60. Find the percentage decrease.", level: 2, marks: 2, calculator: false,
+                options: [
+                    { text: "20%", rationale: "This is the decrease in dollars ($80 - $60 = $20), not the percentage.", isCorrect: false },
+                    { text: "25%", rationale: "The decrease is $20. Percentage decrease = ($20 / $80) × 100% = 25%.", isCorrect: true },
+                    { text: "33 1/3%", rationale: "This calculates the percentage over the final price ($20 / $60). Percentage decrease is always based on the original price.", isCorrect: false },
+                    { text: "75%", rationale: "This is the percentage of the new price compared to the old price, not the percentage decrease.", isCorrect: false }
+                ],
+                hint: "Percentage Decrease = (Decrease in Value ÷ Original Value) × 100%."
+            },
+            {
+                questionNumber: 17, question: "Jane had $80. She spent 25% of her money on a book and 15% on a meal. How much money did she have left?", level: 2, marks: 2, calculator: false,
+                options: [
+                    { text: "$32", rationale: "This is the amount she spent (40% of $80), not the amount left over.", isCorrect: false },
+                    { text: "$40", rationale: "This would mean she had exactly half left (50%), but she spent 40% in total.", isCorrect: false },
+                    { text: "$48", rationale: "Total spent = 25% + 15% = 40%. Percentage left = 100% - 40% = 60%. 60% of $80 = $48.", isCorrect: true },
+                    { text: "$60", rationale: "This is 75% of $80, assuming she only spent 25%.", isCorrect: false }
+                ],
+                hint: "Add the percentages she spent together first. What percentage of the money is left?"
+            },
+            {
+                questionNumber: 18, question: "A club had 150 members. The number of members increased by 20% this year. How many members are there now?", level: 2, marks: 2, calculator: false,
+                options: [
+                    { text: "170", rationale: "This simply adds 20 to 150. The 20% is a percentage, so you need to find 20% of 150 first.", isCorrect: false },
+                    { text: "180", rationale: "Increase = 20% of 150 = 30. Total members now = 150 + 30 = 180.", isCorrect: true },
+                    { text: "120", rationale: "This is subtracting 20% instead of adding it.", isCorrect: false },
+                    { text: "30", rationale: "This is only the increase in members, not the new total.", isCorrect: false }
+                ],
+                hint: "The new total is 100% + 20% = 120% of the original number of members."
+            },
+            {
+                questionNumber: 19, question: "A refrigerator is priced at $1000. During a sale, there is a 15% discount. How much is the discount?", level: 2, marks: 2, calculator: false,
+                options: [
+                    { text: "$850", rationale: "This is the price AFTER the discount, but the question asks for the discount amount itself.", isCorrect: false },
+                    { text: "$150", rationale: "The discount amount is 15% of $1000 = 15/100 × 1000 = $150.", isCorrect: true },
+                    { text: "$15", rationale: "This is a calculation error. Remember to multiply by 1000, not 100.", isCorrect: false },
+                    { text: "$1150", rationale: "This is adding the discount to the price. Discounts are subtracted.", isCorrect: false }
+                ],
+                hint: "Read the question carefully. It asks for the amount of the discount, not the final price to be paid."
+            },
+            {
+                questionNumber: 20, question: "There were 440 people at a park. 25% of them were women and the rest were men. How many men were there?", level: 2, marks: 2, calculator: false,
+                options: [
+                    { text: "110", rationale: "This is 25% of 440, which is the number of women, not men.", isCorrect: false },
+                    { text: "330", rationale: "If 25% were women, then 100% - 25% = 75% were men. 75% (or 3/4) of 440 = 330.", isCorrect: true },
+                    { text: "415", rationale: "This is simply subtracting 25 from 440, but 25 is a percentage.", isCorrect: false },
+                    { text: "220", rationale: "This is 50% of the people at the park.", isCorrect: false }
+                ],
+                hint: "If 25% are women, what percentage are men? Use that percentage to find the number of men."
+            },
+            {
+                questionNumber: 21, question: "A television is priced at $250. The price was first increased by 10%, and then decreased by 5% during a clearance sale. What is the final price of the television?", level: 3, marks: 3, calculator: true,
+                options: [
+                    { text: "$262.50", rationale: "This assumes the total change was a simple +10% - 5% = +5%. 105% of 250 = 262.50. However, successive percentages must be applied sequentially.", isCorrect: false },
+                    { text: "$261.25", rationale: "First increase: $250 × 1.10 = $275. Then decrease: $275 × 0.95 = $261.25.", isCorrect: true },
+                    { text: "$237.50", rationale: "This would be the price if it was decreased by 5% first, but then not increased by 10%.", isCorrect: false },
+                    { text: "$275.00", rationale: "This is the price after only the 10% increase.", isCorrect: false }
+                ],
+                hint: "You cannot simply add and subtract percentages (10% - 5%). Apply the 10% increase to find a new price, and then apply the 5% decrease to that new price."
+            },
+            {
+                questionNumber: 22, question: "In a school, the ratio of boys to girls is 7:4. 30% of the boys and 60% of the girls joined the Science Club. The rest joined the Art Club. What is the ratio of students in the Science Club to the Art Club?", level: 3, marks: 3, calculator: true,
+                options: [
+                    { text: "9:13", rationale: "Let boys = 70u, girls = 40u (total 110u). Science club = 30% of 70u + 60% of 40u = 21u + 24u = 45u. Art Club = 110u - 45u = 65u. Ratio 45:65 simplifies to 9:13.", isCorrect: true },
+                    { text: "45:110", rationale: "This is the ratio of students in the Science Club to the total number of students, not the Art Club.", isCorrect: false },
+                    { text: "9:22", rationale: "This is the ratio of students in the Science Club to the total students, fully simplified.", isCorrect: false },
+                    { text: "1:1", rationale: "This comes from incorrectly adding the percentages directly or miscalculating the units.", isCorrect: false }
+                ],
+                hint: "Change the ratio 7:4 to 70:40 to make it easier to calculate percentages. Find the total number of 'units' in the Science Club and the Art Club."
+            },
+            {
+                questionNumber: 23, question: "Tom had $500. He spent 20% of his money on books, 30% of the *remaining* money on clothes, and saved the rest. How much money did he save?", level: 3, marks: 3, calculator: true,
+                options: [
+                    { text: "$250", rationale: "This assumes he spent 20% + 30% = 50% of his original money. The 30% is based on the *remaining* money, not the original amount.", isCorrect: false },
+                    { text: "$280", rationale: "Books = 20% of 500 = 100. Remainder = 400. Clothes = 30% of 400 = 120. Saved = 400 - 120 = 280.", isCorrect: true },
+                    { text: "$120", rationale: "This is the amount he spent on clothes, not the amount he saved.", isCorrect: false },
+                    { text: "$150", rationale: "This is 30% of the original $500, failing to apply the 'remainder' concept.", isCorrect: false }
+                ],
+                hint: "Be careful with the word 'remaining'. First find out how much money is left after buying books, then calculate 30% of that new amount."
+            },
+            {
+                questionNumber: 24, question: "16% of the monkeys in a forest were black. 24 of the black monkeys were male. The remaining 3/5 of the black monkeys were female. How many monkeys were there in the forest altogether?", level: 3, marks: 3, calculator: true,
+                options: [
+                    { text: "150", rationale: "This results from incorrect association of parts to wholes. Remember that 24 represents 2/5 of the black monkeys.", isCorrect: false },
+                    { text: "375", rationale: "If 3/5 of black monkeys are female, then 2/5 are male. 2/5 -> 24, so 5/5 -> 60. Total black monkeys = 60. Since 16% -> 60, 100% -> (60 / 16) × 100 = 375.", isCorrect: true },
+                    { text: "250", rationale: "This error occurs if you assume 24 is 3/5 or miscalculate the 16% step.", isCorrect: false },
+                    { text: "60", rationale: "This is the total number of black monkeys, not the total number of monkeys in the forest.", isCorrect: false }
+                ],
+                hint: "If 3/5 of the black monkeys are female, what fraction are male? Use the 24 male monkeys to find the total number of black monkeys first."
+            },
+            {
+                questionNumber: 25, question: "25% of the students at a tuition centre were girls and the rest were boys. When 8 girls left, the percentage of girls decreased to 20% of the total number of students. How many students were at the tuition centre at first?", level: 3, marks: 3, calculator: true,
+                options: [
+                    { text: "128", rationale: "Before: G:B = 1:3 = 4:12. After: G:B = 20:80 = 1:4 = 3:12 (Boys unchanged, so make B units equal). Decrease in girls = 1 unit = 8. Total at first = 16 units = 128.", isCorrect: true },
+                    { text: "160", rationale: "This happens if you assume 5% of the students equals 8 students. However, the total number of students changed, so you cannot subtract the percentages directly.", isCorrect: false },
+                    { text: "120", rationale: "This is the number of students remaining at the centre AFTER the girls left ($128 - 8$).", isCorrect: false },
+                    { text: "96", rationale: "This is the number of boys, which remained unchanged throughout.", isCorrect: false }
+                ],
+                hint: "This is a 'Single Unchanged' problem. The number of boys did not change. Convert the percentages to ratios (Girls:Boys) and make the boys' units the same before and after."
+            },
+            {
+                questionNumber: 26, question: "40% of the markers in a box were red and the rest were blue. When 30 red markers were traded for blue markers, the percentage of red markers dropped to 25%. How many markers were there in the box altogether?", level: 3, marks: 3, calculator: true,
+                options: [
+                    { text: "150", rationale: "This calculates the units incorrectly by subtracting the percentages directly.", isCorrect: false },
+                    { text: "120", rationale: "This calculates the number of blue markers at first, not the total.", isCorrect: false },
+                    { text: "200", rationale: "Total Unchanged! Imagine a pizza with 20 slices; if you swap pepperoni for cheese, you still have 20 slices! Before: R:B:Total = 40:60:100 = 2:3:5 (or 8:12:20 units). After: R:B:Total = 25:75:100 = 1:3:4 (or 5:15:20 units). The total units (20u) are the same. Red went from 8u to 5u, a drop of 3u. 3u = 30 markers, so 1u = 10. Total markers = 20u × 10 = 200.", isCorrect: true },
+                    { text: "250", rationale: "This assumes the total units changed after the trade, but the total number of markers remained the same.", isCorrect: false }
+                ],
+                hint: "This is a 'Total Unchanged' problem. Think of a box of 20 chocolates—if you swap a dark chocolate for a white chocolate, you still have 20 chocolates! Make the Total ratio units the same for both the Before and After."
+            },
+            {
+                questionNumber: 27, question: "Alice and Betty had some money. Alice's money was 40% of Betty's money. After they bought the same tuition bag and spent $60 each, Alice's money became 25% of Betty's money. How much money did Alice have at first?", level: 3, marks: 3, calculator: true,
+                options: [
+                    { text: "$150", rationale: "This is the difference in their money, not the amount Alice had at first.", isCorrect: false },
+                    { text: "$120", rationale: "Difference Unchanged! Think of an age gap: if one sister is 3 years older, she will always be 3 years older! Before: A:B = 40:100 = 2:5 (Difference is 3u). After: A:B = 25:100 = 1:4 (Difference is 3u). Since the difference is already matched at 3u, we compare Alice directly: Alice went from 2u to 1u. 1u = $60. Alice at first = 2u × $60 = $120.", isCorrect: true },
+                    { text: "$300", rationale: "This is the amount of money Betty had at first.", isCorrect: false },
+                    { text: "$60", rationale: "This is the amount Alice had left AFTER spending the money.", isCorrect: false }
+                ],
+                hint: "This is a 'Constant Difference' problem. Since they spent the EXACT same amount ($60), the gap between their money stays the same. Match the difference in units before and after!"
+            },
+            {
+                questionNumber: 28, question: "There was a total of 440 people in a park. 25% of them were women. When some men left the park, the percentage of women increased to 55%. How many men left the park?", level: 3, marks: 3, calculator: true,
+                options: [
+                    { text: "110", rationale: "This is the number of women in the park, which did not change.", isCorrect: false },
+                    { text: "240", rationale: "Women = 25% of 440 = 110. Women unchanged. New total: 55% -> 110, so 100% -> 200. Men originally = 440 - 110 = 330. Men now = 200 - 110 = 90. Men left = 330 - 90 = 240.", isCorrect: true },
+                    { text: "200", rationale: "This is the NEW total number of people in the park after the men left.", isCorrect: false },
+                    { text: "90", rationale: "This is the number of men remaining in the park, not the number who left.", isCorrect: false }
+                ],
+                hint: "This is a 'Single Unchanged' problem. The number of women did not change. Find the actual number of women first, then use it to find the new total number of people."
+            },
+            {
+                questionNumber: 29, question: "During a sale, Mrs Tan bought a refrigerator at a discount of 15%. She had to pay a GST of 9% on the discounted price. The original price was $1800. How much did she pay in total?", level: 3, marks: 3, calculator: true,
+                options: [
+                    { text: "$1692.00", rationale: "This error occurs by taking 15% off $1800, then adding 9% of $1800 instead of 9% of the discounted price.", isCorrect: false },
+                    { text: "$1530.00", rationale: "This is the price after the discount, but before the GST is added.", isCorrect: false },
+                    { text: "$1667.70", rationale: "Discounted price = 0.85 × 1800 = 1530. GST = 0.09 × 1530 = 137.70. Total = 1530 + 137.70 = 1667.70.", isCorrect: true },
+                    { text: "$1962.00", rationale: "This calculates a 9% GST on $1800, without taking the 15% discount.", isCorrect: false }
+                ],
+                hint: "Always apply GST to the price AFTER the discount has been deducted."
+            },
+            {
+                questionNumber: 30, question: "A baker baked some chocolate and vanilla cupcakes. If he sells 30 chocolate cupcakes, the number of chocolate cupcakes left will be 20% of the total cupcakes left. If he sells 30 vanilla cupcakes instead, the number of chocolate cupcakes will be 40% of the total cupcakes left. How many chocolate cupcakes did he bake?", level: 3, marks: 3, calculator: true,
+                options: [
+                    { text: "120", rationale: "This is the number of vanilla cupcakes baked.", isCorrect: false },
+                    { text: "60", rationale: "Two Scenarios! Scenario 1 (Sell 30 Choc): Choc left is 20%, so Van is 80%. Ratio C:V = 1:4. Vanilla = 4 × (C - 30) = 4C - 120. Scenario 2 (Sell 30 Van): Choc is 40%, Van left is 60%. Ratio C:V = 2:3. Van left = (3 × C) ÷ 2. We equate the vanilla units and solve to find C = 60.", isCorrect: true },
+                    { text: "90", rationale: "This is a calculation error caused by mixing up the percentages of the remainders.", isCorrect: false },
+                    { text: "180", rationale: "This is the TOTAL number of cupcakes baked, not just the chocolate ones.", isCorrect: false }
+                ],
+                hint: "This is a 'Two Scenarios' problem. Imagine two parallel universes! Write down the before and after units for each universe separately, then find a way to link them together using the cupcakes that weren't sold."
+            }
+        ];
+
+        // Helper to call Gemini API with retry logic
+        const callGeminiAPI = async (prompt) => {
+            const isPreview = !apiKey || apiKey.trim() === "";
+            
+            let url;
+            let requestBody;
+
+            if (isPreview) {
+                // PREVIEW MODE: Uses the Canvas environment's required model and format
+               url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=${apiKey}`;
+                requestBody = {
+                    contents: [{ parts: [{ text: prompt }] }],
+                    systemInstruction: { 
+                        parts: [{ text: "You are Hachiware, a cute, encouraging math tutor for 12-year-old students taking the PSLE Math exam. Your goal is to explain concepts to weaker students in the simplest way possible. Base your explanations on standard PSLE heuristics (e.g., Unitary Method / finding 1%, identifying the 100% Whole, Single Unchanged Variable, Total Unchanged). Use a friendly tone and emojis." }] 
+                    }
+                };
+            } else {
+                // LOCAL MODE: Uses the standard public model with your real API key
+                url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+                
+                // We combine the instructions directly into the text to prevent "Invalid JSON / systemInstruction" errors on standard keys
+                const fullPrompt = "You are Hachiware, a cute, encouraging math tutor for 12-year-old students taking the PSLE Math exam. Your goal is to explain concepts to weaker students in the simplest way possible. Base your explanations on standard PSLE heuristics (e.g., Unitary Method / finding 1%, identifying the 100% Whole). Use a friendly tone and emojis.\n\nSTUDENT QUESTION / CONTEXT:\n" + prompt;
+                
+                requestBody = {
+                    contents: [{ parts: [{ text: fullPrompt }] }]
+                };
+            }
+
+            let retries = 3;
+            let delay = 1000;
+            let errorMessage = "";
+
+            while (retries > 0) {
+                try {
+                    const response = await fetch(url, {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(requestBody)
+                    });
+
+                    if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error?.message || `HTTP ${response.status}`);
+                    }
+                    const data = await response.json();
+                    return data.candidates[0].content.parts[0].text;
+                } catch (error) {
+                    errorMessage = error.message;
+                    
+                    // Fallback to an older reliable model if the first public one is "not found"
+                    if (!isPreview && errorMessage.includes("not found")) {
+                        url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.0-pro:generateContent?key=${apiKey}`;
+                    }
+
+                    retries--;
+                    if (retries === 0) {
+                        return `Oh no! My brain is a little fuzzy right now. (Error: ${errorMessage}). 😿`;
+                    }
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                    delay *= 2;
+                }
+            }
+        };
+
+        function App() {
+            // Memoize and shuffle the quiz data on load so it stays consistent during a single attempt
+            const quizData = useMemo(() => {
+                const shuffleArray = (array) => {
+                    const shuffled = [...array];
+                    for (let i = shuffled.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+                    }
+                    return shuffled;
+                };
+
+                // Helper to shuffle the choices within each question
+                const shuffleOptions = (questions) => {
+                    return questions.map(q => ({
+                        ...q,
+                        options: shuffleArray(q.options)
+                    }));
+                };
+
+                // Filter by level and shuffle the options for every question
+                const level1 = shuffleOptions(sourceQuizData.filter(q => q.level === 1));
+                const level2 = shuffleOptions(sourceQuizData.filter(q => q.level === 2));
+                const level3 = shuffleOptions(sourceQuizData.filter(q => q.level === 3));
+
+                return [
+                    ...shuffleArray(level1),
+                    ...shuffleArray(level2),
+                    ...shuffleArray(level3)
+                ];
+            }, []);
+
+            const [studentName, setStudentName] = useState("");
+            const [hasStarted, setHasStarted] = useState(false);
+            const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+            const [answers, setAnswers] = useState(new Array(quizData.length).fill(null));
+            
+            // Timer State
+            const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+            // Hint State
+            const [showHint, setShowHint] = useState(false);
+            const [isAiHintLoading, setIsAiHintLoading] = useState(false);
+            const [aiHintText, setAiHintText] = useState("");
+
+            // Review State
+            const [isFinished, setIsFinished] = useState(false);
+            const [showReview, setShowReview] = useState(false);
+            const [aiExplanations, setAiExplanations] = useState({});
+            const [isAiExplanationLoading, setIsAiExplanationLoading] = useState({});
+            const [autoSubmitted, setAutoSubmitted] = useState(false);
+
+            const maxScore = quizData.reduce((acc, curr) => acc + curr.marks, 0);
+
+            // Timer Effect
+            useEffect(() => {
+                let interval = null;
+                if (hasStarted && !isFinished) {
+                    interval = setInterval(() => {
+                        setElapsedSeconds(prev => prev + 1);
+                    }, 1000);
+                } else {
+                    clearInterval(interval);
+                }
+                return () => clearInterval(interval);
+            }, [hasStarted, isFinished]);
+
+            // Background Auto-Submit Effect
+            useEffect(() => {
+                if (isFinished && !autoSubmitted) {
+                    // Calculate score immediately upon finishing
+                    let finalScore = 0;
+                    answers.forEach((ansIndex, qIndex) => {
+                        if (ansIndex !== null && quizData[qIndex].options[ansIndex].isCorrect) {
+                            finalScore += quizData[qIndex].marks;
+                        }
+                    });
+                    
+                    const minutes = Math.floor(elapsedSeconds / 60);
+                    const seconds = elapsedSeconds % 60;
+                    const timeTaken = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+                    // Convert Google Form view URL to response submission URL
+                    const submitUrl = GOOGLE_FORM_BASE_URL.replace('/viewform', '/formResponse');
+                    const formData = new FormData();
+                    formData.append(GOOGLE_FORM_NAME_ENTRY, studentName);
+                    formData.append(GOOGLE_FORM_SCORE_ENTRY, finalScore.toString());
+                    formData.append(GOOGLE_FORM_TIME_ENTRY, timeTaken);
+
+                    // Send data silently in the background
+                    fetch(submitUrl, {
+                        method: 'POST',
+                        mode: 'no-cors', // Required to bypass cross-origin restrictions for Google Forms
+                        body: formData
+                    }).then(() => {
+                        setAutoSubmitted(true);
+                    }).catch((error) => {
+                        console.error("Form auto-submission error", error);
+                        setAutoSubmitted(true); // Prevent infinite retry loops if it fails
+                    });
+                }
+            }, [isFinished, autoSubmitted, answers, quizData, elapsedSeconds, studentName]);
+
+            // Format seconds to MM:SS
+            const formatTime = (totalSeconds) => {
+                const minutes = Math.floor(totalSeconds / 60);
+                const seconds = totalSeconds % 60;
+                return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+            };
+
+            const calculateScore = () => {
+                let score = 0;
+                answers.forEach((ansIndex, qIndex) => {
+                    if (ansIndex !== null && quizData[qIndex].options[ansIndex].isCorrect) {
+                        score += quizData[qIndex].marks;
+                    }
+                });
+                return score;
+            };
+
+            const handleStart = (e) => {
+                e.preventDefault();
+                if (studentName.trim().length > 0) {
+                    setHasStarted(true);
+                }
+            };
+
+            const handleSelectOption = (index) => {
+                const newAnswers = [...answers];
+                newAnswers[currentQuestionIndex] = index;
+                setAnswers(newAnswers);
+            };
+
+            const resetHintState = () => {
+                setShowHint(false);
+                setAiHintText("");
+                setIsAiHintLoading(false);
+            };
+
+            const handleNext = () => {
+                resetHintState();
+                if (currentQuestionIndex < quizData.length - 1) {
+                    setCurrentQuestionIndex(currentQuestionIndex + 1);
+                } else {
+                    setIsFinished(true);
+                }
+            };
+
+            const handlePrevious = () => {
+                resetHintState();
+                if (currentQuestionIndex > 0) {
+                    setCurrentQuestionIndex(currentQuestionIndex - 1);
+                }
+            };
+
+            // Feature 1: Generate AI Hint
+            const handleAskHachiwareForHint = async () => {
+                if (aiHintText) return; 
+
+                setIsAiHintLoading(true);
+                const q = quizData[currentQuestionIndex];
+                
+                const prompt = `The student is currently stuck on this PSLE Math question: "${q.question}". 
+                They have already been given this basic hint: "${q.hint}".
+                Provide a very simple, encouraging alternative hint that guides them to the FIRST step. 
+                Apply standard PSLE Math percentage strategies (like identifying the 100% 'whole', using the unitary method to find 1%, or checking for unchanged variables). 
+                Use extremely simple language suitable for a weaker student. Do NOT give away the final answer. Keep it under 3 sentences.`;
+                
+                const responseText = await callGeminiAPI(prompt);
+                if (responseText) setAiHintText(responseText);
+                setIsAiHintLoading(false);
+            };
+
+            // Feature 2: Generate Story Explanation
+            const handleAskHachiwareForStory = async (questionIndex) => {
+                setIsAiExplanationLoading(prev => ({ ...prev, [questionIndex]: true }));
+                
+                const q = quizData[questionIndex];
+                const correctOption = q.options.find(opt => opt.isCorrect);
+                
+                const prompt = `The student got this math question wrong: "${q.question}". 
+                The correct answer is "${correctOption.text}". 
+                Explain the solution step-by-step using a fun, very simple story (involving animals, everyday objects, or Chiikawa characters). 
+                Ensure the math logic aligns with PSLE methods (like finding 100% first, unitary method, or model drawing concepts). 
+                Use highly simplified language so a weaker student can easily follow the logic. Keep it under 5 sentences.`;
+                
+                const responseText = await callGeminiAPI(prompt);
+                
+                if (responseText) {
+                    setAiExplanations(prev => ({ ...prev, [questionIndex]: responseText }));
+                }
+                setIsAiExplanationLoading(prev => ({ ...prev, [questionIndex]: false }));
+            };
+
+            const submitToWhatsApp = () => {
+                const score = calculateScore();
+                const timeTaken = formatTime(elapsedSeconds);
+                const text = `Hi Teacher! I am ${studentName}. I just completed the PSLE Math Percentages Quiz in ${timeTaken} and scored ${score}/${maxScore} marks!`;
+                const whatsappUrl = `https://api.whatsapp.com/send?phone=${TEACHER_WHATSAPP_NUMBER}&text=${encodeURIComponent(text)}`;
+                window.open(whatsappUrl, '_blank');
+            };
+
+            // ----------------------------------------------------------------
+            // SCREEN 1: WELCOME SCREEN
+            // ----------------------------------------------------------------
+            if (!hasStarted) {
+                return (
+                    <div className="min-h-screen flex items-center justify-center p-4">
+                        <div className="max-w-md w-full bg-white rounded-xl shadow-lg p-8 space-y-6">
+                            <div className="text-center">
+                                <div className="relative inline-block">
+                                    <img 
+                                        src={MASCOT_IMAGE_URL} 
+                                        alt="Math Mascot" 
+                                        className="w-24 h-24 rounded-full mx-auto mb-4 border-4 border-blue-100 shadow-sm object-cover"
+                                    />
+                                    <div className="absolute -top-2 -right-2 bg-yellow-100 p-1.5 rounded-full shadow-sm">
+                                        <Icon name="sparkles" size={16} className="text-yellow-600" />
+                                    </div>
+                                </div>
+                                <h1 className="text-2xl font-bold text-slate-800">PSLE Math Mastery</h1>
+                                <p className="text-slate-500 mt-2">Topic: Percentages & Ratios</p>
+                            </div>
+                            
+                            <div className="bg-slate-50 p-4 rounded-lg text-sm text-slate-600 space-y-2">
+                                <p><strong>Level 1 (Basic):</strong> 1 Mark each, No Calculator</p>
+                                <p><strong>Level 2 (Intermediate):</strong> 2 Marks each, No Calculator</p>
+                                <p><strong>Level 3 (Advanced):</strong> 3 Marks each, Calculator Allowed</p>
+                                <p className="pt-2 font-semibold text-blue-800 flex items-center">
+                                    <Icon name="sparkles" size={14} className="mr-1" />
+                                    Powered by Hachiware AI Tutor!
+                                </p>
+                            </div>
+
+                            <form onSubmit={handleStart} className="space-y-4">
+                                <div>
+                                    <label htmlFor="name" className="block text-sm font-medium text-slate-700">Student Name</label>
+                                    <input 
+                                        type="text" 
+                                        id="name" 
+                                        required
+                                        className="mt-1 block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+                                        placeholder="Enter your name to begin..."
+                                        value={studentName}
+                                        onChange={(e) => setStudentName(e.target.value)}
+                                    />
+                                </div>
+                                <button 
+                                    type="submit" 
+                                    className="w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+                                >
+                                    Start Quiz
+                                </button>
+                            </form>
+                        </div>
+                    </div>
+                );
+            }
+
+            // ----------------------------------------------------------------
+            // SCREEN 3: RESULTS & REVIEW SCREEN
+            // ----------------------------------------------------------------
+            if (isFinished) {
+                const score = calculateScore();
+                const percentage = Math.round((score / maxScore) * 100);
+                const timeTaken = formatTime(elapsedSeconds);
+                
+                return (
+                    <div className="min-h-screen p-4 py-8">
+                        <div className="max-w-2xl mx-auto space-y-6">
+                            
+                            <div className="bg-white rounded-xl shadow-lg p-8 text-center space-y-6">
+                                <div className="flex flex-col items-center justify-center space-y-4 mb-2">
+                                    <img 
+                                        src={MASCOT_IMAGE_URL} 
+                                        alt="Math Mascot" 
+                                        className="w-20 h-20 rounded-full border-4 border-blue-50 shadow-sm object-cover"
+                                    />
+                                    <h2 className="text-3xl font-bold text-slate-800">Great job, {studentName}!</h2>
+                                </div>
+                                
+                                <div className="relative inline-flex items-center justify-center">
+                                    <svg className="w-32 h-32 transform -rotate-90">
+                                        <circle cx="64" cy="64" r="60" className="text-slate-100" strokeWidth="8" fill="transparent" stroke="currentColor" />
+                                        <circle 
+                                            cx="64" cy="64" r="60" 
+                                            className={`${percentage >= 75 ? 'text-green-500' : percentage >= 50 ? 'text-yellow-500' : 'text-red-500'}`} 
+                                            strokeWidth="8" fill="transparent" strokeDasharray={377} strokeDashoffset={377 - (377 * percentage) / 100} stroke="currentColor" 
+                                            strokeLinecap="round"
+                                        />
+                                    </svg>
+                                    <div className="absolute flex flex-col items-center justify-center">
+                                        <span className="text-3xl font-bold text-slate-700">{score}</span>
+                                        <span className="text-sm text-slate-500">out of {maxScore}</span>
+                                    </div>
+                                </div>
+
+                                <div className="flex justify-center items-center space-x-2 text-slate-600 bg-slate-50 py-2 px-4 rounded-lg inline-flex mx-auto border border-slate-100">
+                                    <Icon name="clock" size={18} />
+                                    <span className="font-medium">Time Taken: {timeTaken}</span>
+                                </div>
+
+                                <p className="text-lg text-slate-600">
+                                    {percentage >= 75 ? "Excellent work! You have a strong grasp of Percentages." : 
+                                     percentage >= 50 ? "Good effort! Review the mistakes to perfect your understanding." : 
+                                     "Keep practicing! Read the explanations below to learn from your mistakes."}
+                                </p>
+
+                                {/* Auto-Submit Status Indicator */}
+                                <div className="mt-4 p-3 bg-blue-50 rounded-lg border border-blue-100 max-w-sm mx-auto">
+                                    {autoSubmitted ? (
+                                        <p className="text-sm text-green-700 font-medium flex items-center justify-center">
+                                            <Icon name="check-circle" size={18} className="mr-2 text-green-600" />
+                                            Results securely submitted to Teacher!
+                                        </p>
+                                    ) : (
+                                        <p className="text-sm text-blue-700 font-medium flex items-center justify-center">
+                                            <Icon name="loader" size={18} className="mr-2 animate-spin text-blue-600" />
+                                            Submitting results to Teacher...
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div className="flex flex-col sm:flex-row gap-4 justify-center pt-4 border-t border-slate-100">
+                                    <button 
+                                        onClick={submitToWhatsApp}
+                                        className="flex items-center justify-center px-6 py-3 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-green-600 hover:bg-green-700 transition-colors"
+                                    >
+                                        <Icon name="send" size={18} className="mr-2" /> Send Results via WhatsApp
+                                    </button>
+                                </div>
+                                
+                                <button 
+                                    onClick={() => setShowReview(!showReview)}
+                                    className="text-blue-600 hover:text-blue-800 text-sm font-medium underline mt-4 inline-block"
+                                >
+                                    {showReview ? "Hide Review" : "Review My Answers"}
+                                </button>
+                            </div>
+
+                            {/* Review Section */}
+                            {showReview && (
+                                <div className="space-y-6">
+                                    <h3 className="text-xl font-bold text-slate-800 px-2">Detailed Review</h3>
+                                    {quizData.map((q, idx) => {
+                                        const selectedAnsIndex = answers[idx];
+                                        const isUnanswered = selectedAnsIndex === null;
+                                        const isCorrect = !isUnanswered && q.options[selectedAnsIndex].isCorrect;
+                                        const correctOptionIndex = q.options.findIndex(opt => opt.isCorrect);
+
+                                        return (
+                                            <div key={idx} className={`bg-white rounded-xl shadow p-6 border-l-4 ${isCorrect ? 'border-green-500' : 'border-red-500'}`}>
+                                                <div className="flex justify-between items-start mb-4">
+                                                    <span className="text-sm font-bold text-slate-500">Question {idx + 1}</span>
+                                                    {isCorrect ? 
+                                                        <span className="flex items-center text-green-600 text-sm font-medium"><Icon name="check-circle" size={16} className="mr-1"/> Correct (+{q.marks}m)</span> : 
+                                                        <span className="flex items-center text-red-600 text-sm font-medium"><Icon name="x-circle" size={16} className="mr-1"/> Incorrect (0m)</span>
+                                                    }
+                                                </div>
+                                                <p className="text-slate-800 font-medium mb-4">{q.question}</p>
+                                                
+                                                <div className="space-y-2 mb-4">
+                                                    {q.options.map((opt, optIdx) => (
+                                                        <div key={optIdx} className={`p-3 rounded-lg text-sm ${opt.isCorrect ? 'bg-green-50 border border-green-200 text-green-800' : selectedAnsIndex === optIdx ? 'bg-red-50 border border-red-200 text-red-800' : 'bg-slate-50 border border-slate-200 text-slate-500'}`}>
+                                                            {opt.text}
+                                                            {opt.isCorrect && <Icon name="check-circle" size={14} className="inline ml-2 text-green-600"/>}
+                                                            {selectedAnsIndex === optIdx && !opt.isCorrect && <Icon name="x-circle" size={14} className="inline ml-2 text-red-600"/>}
+                                                        </div>
+                                                    ))}
+                                                </div>
+
+                                                {!isCorrect && (
+                                                    <div className="mt-4 bg-blue-50 text-blue-900 p-4 rounded-lg text-sm">
+                                                        <p className="mb-2"><strong>Teacher's Rationale: </strong>
+                                                        {selectedAnsIndex !== null ? q.options[selectedAnsIndex].rationale : "Question was not answered. "}
+                                                        {selectedAnsIndex !== null && !q.options[selectedAnsIndex].isCorrect && ` The correct answer is ${q.options[correctOptionIndex].text}. ${q.options[correctOptionIndex].rationale}`}
+                                                        </p>
+
+                                                        {/* Feature 2: Story Explanation Button */}
+                                                        {!aiExplanations[idx] && !isAiExplanationLoading[idx] && (
+                                                            <button 
+                                                                onClick={() => handleAskHachiwareForStory(idx)}
+                                                                className="mt-3 flex items-center px-4 py-2 bg-white border border-blue-200 text-blue-700 rounded-md hover:bg-blue-100 transition shadow-sm font-medium"
+                                                            >
+                                                                <Icon name="sparkles" size={16} className="mr-2 text-yellow-500" /> Ask Hachiware to explain with a story!
+                                                            </button>
+                                                        )}
+
+                                                        {isAiExplanationLoading[idx] && (
+                                                            <div className="mt-4 flex items-center text-blue-700 font-medium bg-white p-3 rounded border border-blue-100">
+                                                                <Icon name="loader" size={16} className="mr-2" /> Hachiware is thinking of a story...
+                                                            </div>
+                                                        )}
+
+                                                        {aiExplanations[idx] && (
+                                                            <div className="mt-4 bg-white p-4 rounded-lg border border-blue-200 shadow-sm flex items-start">
+                                                                <img src={MASCOT_IMAGE_URL} alt="Hachiware" className="w-10 h-10 rounded-full border-2 border-blue-100 mr-3 flex-shrink-0 object-cover mt-1" />
+                                                                <div>
+                                                                    <p className="text-xs font-bold text-blue-800 uppercase tracking-wider mb-1">Hachiware's Story</p>
+                                                                    <p className="text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{aiExplanations[idx]}</p>
+                                                                </div>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+
+                        </div>
+                    </div>
+                );
+            }
+
+            // ----------------------------------------------------------------
+            // SCREEN 2: ACTIVE QUIZ SCREEN
+            // ----------------------------------------------------------------
+            const currentQ = quizData[currentQuestionIndex];
+            const answeredCount = answers.filter(a => a !== null).length;
+            const isCurrentQuestionAnswered = answers[currentQuestionIndex] !== null;
+
+            return (
+                <div className="min-h-screen flex flex-col">
+                    <header className="bg-white shadow-sm px-4 py-3 sticky top-0 z-10">
+                        <div className="max-w-3xl mx-auto flex justify-between items-center">
+                            <div>
+                                <p className="text-xs text-slate-500 font-medium">Student: {studentName}</p>
+                                <h1 className="text-lg font-bold text-slate-800">PSLE Percentages</h1>
+                            </div>
+                            <div className="text-right flex flex-col items-end">
+                                <div className="flex items-center text-slate-700 font-bold bg-slate-100 px-2 py-1 rounded-md mb-1 text-sm border border-slate-200">
+                                    <Icon name="clock" size={14} className="mr-1" />
+                                    {formatTime(elapsedSeconds)}
+                                </div>
+                                <p className="text-sm font-bold text-blue-600">{currentQuestionIndex + 1} of {quizData.length}</p>
+                            </div>
+                        </div>
+                        <div className="max-w-3xl mx-auto mt-3 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div 
+                                className="h-full bg-blue-600 transition-all duration-300" 
+                                style={{ width: `${((currentQuestionIndex + 1) / quizData.length) * 100}%` }}
+                            ></div>
+                        </div>
+                    </header>
+
+                    <main className="flex-grow p-4 py-8 flex items-center justify-center">
+                        <div className="max-w-2xl w-full">
+                            
+                            <div className="flex flex-wrap items-center gap-2 mb-4">
+                                <span className="px-2.5 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-md">
+                                    Level {currentQ.level}
+                                </span>
+                                <span className="px-2.5 py-1 bg-slate-200 text-slate-700 text-xs font-semibold rounded-md">
+                                    {currentQ.marks} {currentQ.marks === 1 ? 'Mark' : 'Marks'}
+                                </span>
+                                <span className={`px-2.5 py-1 text-xs font-semibold rounded-md flex items-center ${currentQ.calculator ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                    {currentQ.calculator ? <Icon name="calculator" size={12} className="mr-1"/> : <Icon name="x-circle" size={12} className="mr-1"/>}
+                                    {currentQ.calculator ? 'Calculator Allowed' : 'No Calculator'}
+                                </span>
+                            </div>
+
+                            <div className="bg-white rounded-xl shadow-sm p-6 md:p-8 mb-6 border border-slate-100">
+                                <h2 className="text-xl md:text-2xl font-medium text-slate-800 leading-relaxed">
+                                    {currentQ.question}
+                                </h2>
+                            </div>
+
+                            <div className="space-y-3 mb-8">
+                                {currentQ.options.map((option, index) => {
+                                    const isSelected = answers[currentQuestionIndex] === index;
+                                    return (
+                                        <button
+                                            key={index}
+                                            onClick={() => handleSelectOption(index)}
+                                            className={`w-full text-left p-4 rounded-xl border-2 transition-all duration-200 flex items-center
+                                                ${isSelected 
+                                                    ? 'border-blue-600 bg-blue-50 text-blue-900 shadow-sm' 
+                                                    : 'border-slate-200 bg-white text-slate-700 hover:border-blue-300 hover:bg-slate-50'
+                                                }`}
+                                        >
+                                            <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center mr-4 flex-shrink-0
+                                                ${isSelected ? 'border-blue-600' : 'border-slate-300'}`}
+                                            >
+                                                {isSelected && <div className="w-3 h-3 rounded-full bg-blue-600" />}
+                                            </div>
+                                            <span className="text-lg">{option.text}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Feature 1: Hint Area */}
+                            <div className="mb-8">
+                                {!showHint ? (
+                                    <button 
+                                        onClick={() => setShowHint(true)}
+                                        className="flex items-center px-4 py-2 bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 font-medium rounded-lg transition-colors shadow-sm"
+                                    >
+                                        <Icon name="help-circle" size={16} className="mr-2 text-amber-600" />
+                                        Show Hint
+                                    </button>
+                                ) : (
+                                    <div className="bg-amber-50 border border-amber-200 rounded-lg p-5 flex items-start shadow-sm relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 w-24 h-24 bg-amber-100 rounded-bl-full opacity-50 pointer-events-none"></div>
+                                        <img 
+                                            src={MASCOT_IMAGE_URL} 
+                                            alt="Mascot Hint" 
+                                            className="w-14 h-14 rounded-full border-2 border-amber-300 mr-4 flex-shrink-0 bg-white object-cover shadow-sm z-10"
+                                        />
+                                        <div className="z-10 w-full">
+                                            <p className="text-xs font-bold text-amber-800 uppercase tracking-wider mb-2 flex items-center">
+                                                Hachiware's Standard Hint
+                                            </p>
+                                            <p className="text-sm text-amber-900 leading-relaxed whitespace-pre-wrap mb-4">
+                                                {currentQ.hint}
+                                            </p>
+                                            
+                                            {/* Gemini AI Hint Section */}
+                                            {!aiHintText && !isAiHintLoading && (
+                                                <button 
+                                                    onClick={handleAskHachiwareForHint}
+                                                    className="flex items-center px-3 py-1.5 bg-white border border-amber-300 text-amber-700 hover:bg-amber-50 text-xs font-medium rounded transition-colors shadow-sm"
+                                                >
+                                                    <Icon name="sparkles" size={14} className="mr-1 text-yellow-500" />
+                                                    Still stuck? Ask Hachiware for an extra AI hint!
+                                                </button>
+                                            )}
+
+                                            {isAiHintLoading && (
+                                                <div className="mt-3 flex items-center text-amber-700 text-sm">
+                                                    <Icon name="loader" size={16} className="mr-2" /> Thinking of the perfect extra hint...
+                                                </div>
+                                            )}
+
+                                            {aiHintText && (
+                                                <div className="mt-3 pt-3 border-t border-amber-200">
+                                                    <p className="text-xs font-bold text-amber-800 uppercase tracking-wider mb-2 flex items-center">
+                                                        <Icon name="sparkles" size={12} className="mr-1 text-amber-600" /> Extra AI Hint
+                                                    </p>
+                                                    <p className="text-sm text-amber-900 leading-relaxed whitespace-pre-wrap">{aiHintText}</p>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                        </div>
+                    </main>
+
+                    <footer className="bg-white border-t border-slate-200 p-4 sticky bottom-0 z-10">
+                        <div className="max-w-3xl mx-auto flex justify-between items-center">
+                            <button
+                                onClick={handlePrevious}
+                                disabled={currentQuestionIndex === 0}
+                                className={`flex items-center px-4 py-2 text-sm font-medium rounded-lg transition-colors
+                                    ${currentQuestionIndex === 0 ? 'text-slate-300 cursor-not-allowed' : 'text-slate-600 hover:bg-slate-100'}`}
+                            >
+                                <Icon name="chevron-left" size={20} className="mr-1" /> Previous
+                            </button>
+                            
+                            <button
+                                onClick={handleNext}
+                                disabled={!isCurrentQuestionAnswered}
+                                className={`flex items-center px-6 py-2.5 text-white text-sm font-medium rounded-lg shadow-sm transition-colors ${
+                                    !isCurrentQuestionAnswered ? 'bg-blue-300 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'
+                                }`}
+                            >
+                                {currentQuestionIndex === quizData.length - 1 ? 'Finish Quiz' : 'Next'}
+                                {currentQuestionIndex !== quizData.length - 1 && <Icon name="chevron-right" size={20} className="ml-1" />}
+                            </button>
+                        </div>
+                    </footer>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
